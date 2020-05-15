@@ -257,14 +257,6 @@ namespace Discord.Twitter.TtsBot
 
   public class Program
   {
-    const int STD_INPUT_HANDLE = -10;
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    internal static extern IntPtr GetStdHandle(int nStdHandle);
-
-    [DllImport("kernel32.dll", SetLastError = true)]
-    static extern bool CancelIoEx(IntPtr handle, IntPtr lpOverlapped);
-
     static async Task Main(string[] args)
     {
       if(args.Length != 1)
