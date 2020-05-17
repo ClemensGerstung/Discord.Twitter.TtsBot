@@ -21,7 +21,7 @@ Alternatively you can provide the `-r` when calling `dotnet build`.
 
 Create a `config.json` file which must be supplied as the first and only parameter to the bot. 
 ```cmd
-Discord.Twitter.TtsBot config.json
+./Discord.Twitter.TtsBot config.json
 ```
 
 The `config.json` must look like this:
