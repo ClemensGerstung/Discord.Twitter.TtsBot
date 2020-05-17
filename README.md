@@ -8,6 +8,7 @@ Uses .NET Core so it should be able to run everywhere (where .NET Core is suppor
 Don't forget to check the `.csproj` file and edit if necessary and set the `RuntimeIdentifier`. 
 > For valid identifiers check Microsoft's documentation: https://docs.microsoft.com/en-us/dotnet/core/rid-catalog
 
+For instance when running on a Pi add this:
 ```xml
 <PropertyGroup>
   <RuntimeIdentifier>linux-arm</RuntimeIdentifier>
