@@ -186,7 +186,7 @@ namespace Discord.Twitter.TtsBot
       VoiceSelectionParams voice = new VoiceSelectionParams
       {
         LanguageCode = "en-US",
-        Name = "en-IN-Wavenet-C"
+        Name = _option.VoiceName
       };
 
       AudioConfig config = new AudioConfig
