@@ -3,11 +3,25 @@
 A simple bot which checks for new tweets of a user, uses Google Cloud TTS to say the tweet within discord.  
 Uses .NET Core so it should be able to run everywhere (where .NET Core is supported).  
 
+## Configuration/Build
+
+Don't forget to check the `.csproj` file and edit if necessary and set the `RuntimeIdentifier`. 
+> For valid identifiers check Microsoft's documentation: https://docs.microsoft.com/en-us/dotnet/core/rid-catalog
+
+For instance when running on a Pi add this:
+```xml
+<PropertyGroup>
+  <RuntimeIdentifier>linux-arm</RuntimeIdentifier>
+</PropertyGroup>
+```
+
+Alternatively you can provide the `-r` when calling `dotnet build`.
+
 ## Run
 
 Create a `config.json` file which must be supplied as the first and only parameter to the bot. 
 ```cmd
-Discord.Twitter.TtsBot config.json
+./Discord.Twitter.TtsBot config.json
 ```
 
 The `config.json` must look like this:
