@@ -19,6 +19,7 @@ using System.Runtime.InteropServices;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -34,6 +35,7 @@ namespace Discord.Twitter.TtsBot
     private ConcurrentQueue<ITweet> _queue;
     private ManualResetEventSlim _playSoundSignal;
     private Regex _regex;
+    private Regex _tweetIdRegex;
 
     public Exception Exception { get; private set; }
 
@@ -44,14 +46,18 @@ namespace Discord.Twitter.TtsBot
       _playSoundSignal = new ManualResetEventSlim(false);
       _queue = new ConcurrentQueue<ITweet>();
       _regex = new Regex(@"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)");
+      _tweetIdRegex = new Regex(@"\/(?<tweetId>\d+)");
 
       if (option.GoogleSetEnvironmentVariable)
       {
-        Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", option.GoogleApplicationCredentialsPath);
+        //Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", option.GoogleApplicationCredentialsPath);
       }
       
       _discord = new DiscordSocketClient();
-      _ttsClient = TextToSpeechClient.Create();
+      TextToSpeechClientBuilder builder = new TextToSpeechClientBuilder();
+      builder.CredentialsPath = _option.GoogleApplicationCredentialsPath;
+
+      _ttsClient = builder.Build();
 
       _userCredentials = Auth.CreateCredentials(option.TwitterConsumerKey,
                                                 option.TwitterConsumerSecret,
@@ -60,7 +66,7 @@ namespace Discord.Twitter.TtsBot
       Auth.SetCredentials(_userCredentials);
     }
 
-    private async Task PlayTweet()
+    private async Task PlayTweetAsync()
     {
       do
       {
@@ -106,11 +112,14 @@ namespace Discord.Twitter.TtsBot
         thread.Name = "TwitterStream";
         thread.Start();
 
-        await PlayTweet();
-        
+        Thread playThread = new Thread(PlayTweetAsync().Wait);
+        playThread.Name = "PlaySoundThread";
+        playThread.Start();
+
         _finalizeSignal.Wait();
         stream.StopStream();
         thread.Join();
+        playThread.Join();
 
         await _discord.StopAsync();
         await _discord.LogoutAsync();
@@ -166,6 +175,19 @@ namespace Discord.Twitter.TtsBot
         }
         _playSoundSignal.Set();
       }
+
+      if(arguments.Length == 2 &&
+        arguments[0] == "read")
+      {
+        string link = arguments[1];
+        Match match = _tweetIdRegex.Match(link);
+        if(long.TryParse(match.Groups["tweetId"].Value, out long id))
+        {
+          ITweet tweet = await TweetAsync.GetTweet(id);
+          _queue.Enqueue(tweet);
+          _playSoundSignal.Set();
+        }
+      }
     }
 
     private void OnMatchingTweetReceived(object sender, MatchedTweetReceivedEventArgs args)
@@ -201,7 +223,7 @@ namespace Discord.Twitter.TtsBot
         Voice = voice,
         AudioConfig = config
       });
-
+    
       response.AudioContent.WriteTo(destination);
     }
 
