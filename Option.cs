@@ -21,7 +21,7 @@ namespace Discord.Twitter.TtsBot
     public string TwitterUserAccessSecret { get; set; }
 
     [JsonProperty("auth.google.setEnvironmentVariable")]
-    public bool GoogleSetEnvironmentVariable { get; set; }
+    public bool GoogleUseEnvironmentVariable { get; set; }
 
     [JsonProperty("auth.google.applicationCredentials")]
     public string GoogleApplicationCredentialsPath { get; set; }
@@ -32,9 +32,11 @@ namespace Discord.Twitter.TtsBot
     [JsonProperty("data.follow")]
     public string FollowTwitterUser { get; set; }
 
-
     [JsonProperty("data.voiceName")]
     public string VoiceName { get; set; }
+
+    [JsonProperty("data.language")]
+    public string LangaugeCode { get; set; }
 
     [JsonProperty("data.commandPrefix")]
     public string CommandPrefix { get; set; }

@@ -20,11 +20,15 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using log4net;
+using log4net.Config;
 
 namespace Discord.Twitter.TtsBot
 {
   public class TtsBot
   {
+    private ILog __log = LogManager.GetLogger(typeof(TtsBot));
+
     private ManualResetEventSlim _finalizeSignal;
     private Option _option;
     private DiscordSocketClient _discord;
@@ -48,22 +52,38 @@ namespace Discord.Twitter.TtsBot
       _regex = new Regex(@"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)");
       _tweetIdRegex = new Regex(@"\/(?<tweetId>\d+)");
 
-      if (option.GoogleSetEnvironmentVariable)
+      if (option.GoogleUseEnvironmentVariable)
       {
-        //Environment.SetEnvironmentVariable("GOOGLE_APPLICATION_CREDENTIALS", option.GoogleApplicationCredentialsPath);
+        _ttsClient = TextToSpeechClient.Create();
+      }
+      else
+      {
+        if(string.IsNullOrWhiteSpace(_option.GoogleApplicationCredentialsPath))
+          throw new ArgumentNullException(nameof(_option.GoogleApplicationCredentialsPath), "Credential path cannot be empty if not using Enviornment Variable \"GOOGLE_APPLICATION_CREDENTIALS\"");
+
+        TextToSpeechClientBuilder builder = new TextToSpeechClientBuilder();
+        builder.CredentialsPath = _option.GoogleApplicationCredentialsPath;
+
+        _ttsClient = builder.Build();
       }
       
       _discord = new DiscordSocketClient();
-      TextToSpeechClientBuilder builder = new TextToSpeechClientBuilder();
-      builder.CredentialsPath = _option.GoogleApplicationCredentialsPath;
-
-      _ttsClient = builder.Build();
-
+      
       _userCredentials = Auth.CreateCredentials(option.TwitterConsumerKey,
                                                 option.TwitterConsumerSecret,
                                                 option.TwitterUserAccessToken,
                                                 option.TwitterUserAccessSecret);
       Auth.SetCredentials(_userCredentials);
+
+      Console.CancelKeyPress += OnCancelKeyPressed;
+    }
+
+    private void OnCancelKeyPressed(object sender, ConsoleCancelEventArgs e)
+    {
+      __log.Info("Received Cancel, cleaning up");
+
+      _finalizeSignal.Set();
+      e.Cancel = true;
     }
 
     private async Task PlayTweetAsync()
@@ -127,7 +147,6 @@ namespace Discord.Twitter.TtsBot
       catch (Exception exception)
       {
         Exception = exception;
-        _finalizeSignal.Set();
       }
     }
 
@@ -184,8 +203,11 @@ namespace Discord.Twitter.TtsBot
         if(long.TryParse(match.Groups["tweetId"].Value, out long id))
         {
           ITweet tweet = await TweetAsync.GetTweet(id);
-          _queue.Enqueue(tweet);
-          _playSoundSignal.Set();
+          if (tweet.CreatedBy.Id == _twitterUser.Id)
+          {
+            _queue.Enqueue(tweet);
+            _playSoundSignal.Set();
+          }
         }
       }
     }
@@ -207,7 +229,7 @@ namespace Discord.Twitter.TtsBot
 
       VoiceSelectionParams voice = new VoiceSelectionParams
       {
-        LanguageCode = "en-US",
+        LanguageCode = _option.LangaugeCode,
         Name = _option.VoiceName
       };
 
@@ -265,9 +287,8 @@ namespace Discord.Twitter.TtsBot
                                    discord);
         }
         catch (Exception exception)
-        {    
-          Exception = exception;
-          _finalizeSignal.Set();
+        {
+          __log.Error(exception);
         }
         finally
         {
@@ -285,6 +306,10 @@ namespace Discord.Twitter.TtsBot
       {
         return;
       }
+
+      var logRepository = LogManager.GetRepository(typeof(Program).Assembly);
+      XmlConfigurator.Configure(logRepository, 
+                                new FileInfo("log4net.config"));
 
       Option option = JsonConvert.DeserializeObject<Option>(File.ReadAllText(args[0]));
 
