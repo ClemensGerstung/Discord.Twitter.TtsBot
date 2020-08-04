@@ -1,0 +1,93 @@
+﻿syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package discord.twitter.ttsBot.adminAccess;
+
+service AdminAccess {
+  rpc GetTwitterUser (GetTwitterUserRequest) returns (GetTwitterUserResponse);
+  rpc AddTwitterUser (AddTwitterUserRequest) returns (GetTwitterUserResponse);
+  rpc GetAllTwitterUsers (GetAllTwitterUserRequest) returns (GetAllTwitterUserRespone);
+
+  rpc AddQueueItem (AddQueueRequest) returns (AddQueueResponse);
+  rpc GetQueue (GetQueueRequest) returns (GetQueueResponse);
+  rpc GetReadItems (GetQueueRequest) returns (GetQueueResponse);
+  rpc ReadItems (ReadItemsRequest) returns (ReadItemsResponse);
+  rpc ReadNextQueueItems (ReadNextQueueItemsRequest) returns (ReadItemsResponse);
+}
+
+message ReadNextQueueItemsRequest {
+  uint64 count = 1;
+}
+
+message ReadItemsResponse {
+  repeated QueueItem queueItems = 1;
+}
+
+message ReadItemsRequest {
+  repeated QueueItem queueItems = 1;
+}
+
+message GetAllTwitterUserRequest {
+
+}
+
+message GetAllTwitterUserRespone {
+  repeated TwitterUser users = 1;
+}
+
+message AddTwitterUserRequest {
+  oneof user {
+    int64 id = 1;
+    string handle = 2;
+  }
+  string language = 3;
+  string voiceName = 4;
+}
+
+message GetTwitterUserRequest {
+  oneof user {
+    int64 id = 1;
+    string handle = 2;
+  }
+}
+
+message GetTwitterUserResponse {
+  TwitterUser user = 1;
+}
+
+message AddQueueRequest {
+  oneof newItem {
+    int64 tweetId = 1;
+    QueueItem item = 2;
+  }
+}
+
+message AddQueueResponse {
+  QueueItem item = 1;
+}
+
+message GetQueueRequest {
+  repeated TwitterUser users = 1;
+  string filter = 2;
+  google.protobuf.Timestamp from = 3;
+  google.protobuf.Timestamp to = 4;
+}
+
+message GetQueueResponse {
+  repeated QueueItem items = 1;
+}
+
+message QueueItem {
+  int64 tweetId = 1;
+  TwitterUser user = 2;
+  string content = 3;
+  google.protobuf.Timestamp created = 4;
+  uint32 played = 5;
+}
+
+message TwitterUser {
+  int64 id = 1;
+  string handle = 2;
+  string name = 3;
+}

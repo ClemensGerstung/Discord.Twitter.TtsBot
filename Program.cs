@@ -20,6 +20,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Xml.Linq;
+using Discord.Twitter.TtsBot.AdminAccess;
+using Grpc.Core;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -104,7 +106,7 @@ namespace Discord.Twitter.TtsBot
         await _discord.StartAsync();
 
         _twitterUser = User.GetUserFromScreenName(_option.FollowTwitterUser);
-        
+
         IFilteredStream stream = TwitterStream.CreateFilteredStream(_userCredentials, TweetMode.Extended);
         stream.AddFollow(_twitterUser.Id);
         stream.MatchingTweetReceived += OnMatchingTweetReceived;
@@ -276,6 +278,8 @@ namespace Discord.Twitter.TtsBot
       }
     }
   }
+
+  
 
   public class Program
   {
