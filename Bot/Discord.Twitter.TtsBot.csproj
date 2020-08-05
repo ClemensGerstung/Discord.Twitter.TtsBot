@@ -29,7 +29,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="admin-access.proto" GrpcServices="Server" />
+    <Protobuf Include="..\admin-access.proto" GrpcServices="Server">
+      <Link>admin-access.proto</Link>
+    </Protobuf>
   </ItemGroup>
 
   <ItemGroup>
