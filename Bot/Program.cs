@@ -285,7 +285,7 @@ namespace Discord.Twitter.TtsBot
   {
     static async Task Main(string[] args)
     {
-      if(args.Length != 1)
+      if (args.Length != 1)
       {
         return;
       }
@@ -293,7 +293,32 @@ namespace Discord.Twitter.TtsBot
       Option option = JsonConvert.DeserializeObject<Option>(File.ReadAllText(args[0]));
 
       TtsBot bot = new TtsBot(option);
-      await bot.RunAsync();
+
+      Server server = new Server
+      {
+        Services = { AdminAccess.AdminAccess.BindService(new Impl()) },
+        Ports = { new ServerPort("localhost", 50001, ServerCredentials.Insecure) }
+      };
+      server.Start();
+
+      Console.WriteLine("Greeter server listening on port " + 50001);
+      Console.WriteLine("Press any key to stop the server...");
+      Console.ReadLine();
+
+      await server.ShutdownAsync();
     }
+
+    //static async Task Main(string[] args)
+    //{
+    //  if(args.Length != 1)
+    //  {
+    //    return;
+    //  }
+
+    //  Option option = JsonConvert.DeserializeObject<Option>(File.ReadAllText(args[0]));
+
+    //  TtsBot bot = new TtsBot(option);
+    //  await bot.RunAsync();
+    //}
   }
 }
