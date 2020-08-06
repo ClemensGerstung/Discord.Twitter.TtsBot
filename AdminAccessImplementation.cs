@@ -3,40 +3,72 @@ using Grpc.Core;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Tweetinvi;
+using Tweetinvi.Models;
 
 namespace Discord.Twitter.TtsBot
 {
   using IUser = Tweetinvi.Models.IUser;
 
-  class Impl : AdminAccess.AdminAccess.AdminAccessBase
+  public class ReadItemEventArgs : EventArgs
   {
-    private IDictionary<long, TwitterUser> _users = new ConcurrentDictionary<long, TwitterUser>();
-    private IDictionary<long, QueueItem> _items = new ConcurrentDictionary<long, QueueItem>();
-    private ConcurrentQueue<QueueItem> _queue = new ConcurrentQueue<QueueItem>();
+    public string Content { get; }
+
+    internal ReadItemEventArgs(string content)
+    {
+      this.Content = content;
+    }
+  }
+
+  public class Impl : AdminAccess.AdminAccess.AdminAccessBase
+  {
+    private readonly IDictionary<long, TwitterUser> _users = new ConcurrentDictionary<long, TwitterUser>();
+    private readonly ConcurrentDictionary<long, QueueItem> _items = new ConcurrentDictionary<long, QueueItem>();
+    private readonly ConcurrentQueue<long> _queue = new ConcurrentQueue<long>();
 
     public ICollection<TwitterUser> Users => _users.Values;
+
+    public event EventHandler<ReadItemEventArgs> ReadItem;
 
     public override async Task<AddQueueResponse> AddQueueItem(AddQueueRequest request, ServerCallContext context)
     {
       AddQueueResponse response = new AddQueueResponse();
+      QueueItem item = null;
 
       switch (request.NewItemCase)
       {
         case AddQueueRequest.NewItemOneofCase.Item:
-          response.Item = request.Item;
+          item = request.Item;
           break;
         case AddQueueRequest.NewItemOneofCase.TweetId:
-          var tweet = await TweetAsync.GetTweet(request.TweetId);
+          ITweet tweet = await TweetAsync.GetTweet(request.TweetId);
+          item = new QueueItem();
+          item.TweetId = tweet.Id;
+          item.Played = 0;
+          
+          string text = tweet.FullText;
+          if (tweet.IsRetweet)
+          {
+            ITweet retweeted = tweet.RetweetedTweet;
+            text = retweeted.FullText;
+          }
 
-          // TODO: read tweet's content
+          if(tweet.QuotedTweet != null)
+          {
+
+          }
 
           break;
       }
 
+      _queue.Enqueue(item.TweetId);
+      _items.AddOrUpdate(item.TweetId, item, (id, old) => item);
+
+      response.Item = item;
       return response;
     }
 
@@ -68,7 +100,8 @@ namespace Discord.Twitter.TtsBot
     public override Task<GetQueueResponse> GetQueue(GetQueueRequest request, ServerCallContext context)
     {
       GetQueueResponse response = new GetQueueResponse();
-      var items = _queue.ToList();
+      var items = _queue.Select(id => _items[id])
+                        .ToList();
       var from = request.From ?? items.Min(i => i.Created);
       var to = request.To ?? items.Max(i => i.Created);
 
@@ -117,12 +150,36 @@ namespace Discord.Twitter.TtsBot
 
     public override Task<ReadItemsResponse> ReadItems(ReadItemsRequest request, ServerCallContext context)
     {
-      return base.ReadItems(request, context);
+      ReadItemsResponse response = new ReadItemsResponse();
+
+      foreach (var item in request.QueueItems)
+      {
+        var old = _items.GetOrAdd(item.TweetId, item);
+        ReadItem?.Invoke(this, new ReadItemEventArgs(item.Content));
+
+        item.Played++;
+        _items.TryUpdate(item.TweetId, item, old);
+
+        response.QueueItems.Add(item);
+      }
+
+      return Task.FromResult(response);
     }
 
     public override Task<ReadItemsResponse> ReadNextQueueItems(ReadNextQueueItemsRequest request, ServerCallContext context)
     {
-      return base.ReadNextQueueItems(request, context);
+      ReadItemsRequest readRequest = new ReadItemsRequest();
+
+      for (int i = 0; i < request.Count; i++)
+      {
+        if(_queue.TryDequeue(out long id) &&
+          _items.TryGetValue(id, out QueueItem item))
+        {
+          readRequest.QueueItems.Add(item);
+        }
+      }
+
+      return ReadItems(readRequest, context);
     }
   }
 }

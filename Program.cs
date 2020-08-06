@@ -318,6 +318,7 @@ namespace Discord.Twitter.TtsBot
       Option option = JsonConvert.DeserializeObject<Option>(File.ReadAllText(args[0]));
 
       TtsBot bot = new TtsBot(option);
+
       await bot.RunAsync();
     }
   }

@@ -17,7 +17,7 @@ service AdminAccess {
 }
 
 message ReadNextQueueItemsRequest {
-  uint64 count = 1;
+  int32 count = 1;
 }
 
 message ReadItemsResponse {
