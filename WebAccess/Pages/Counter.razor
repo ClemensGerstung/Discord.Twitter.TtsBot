@@ -1,0 +1,20 @@
+﻿@page "/counter"
+@inject Grpc.Net.Client.GrpcChannel Channel
+
+<h1>Counter</h1>
+
+<p>Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+
+@code {
+  private int currentCount = 0;
+
+  private async Task IncrementCount()
+  {
+    var client = new Discord.Twitter.TtsBot.AdminAccess.AdminAccess.AdminAccessClient(Channel);
+    var request = new Discord.Twitter.TtsBot.AdminAccess.ReadItemsRequest();
+    //request.Handle = "realDonaldTrump";
+    var response = await client.ReadItemsAsync(request);
+  }
+}
