@@ -342,3 +342,4 @@ healthchecksdb
 *.dll
 config.json
 launch[Ss]ettings.json
+.vscode/
