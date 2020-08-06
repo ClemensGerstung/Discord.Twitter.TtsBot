@@ -117,7 +117,7 @@ namespace Discord.Twitter.TtsBot
 
     public override Task<ReadItemsResponse> ReadItems(ReadItemsRequest request, ServerCallContext context)
     {
-      return base.ReadItems(request, context);
+      return Task.FromResult(new ReadItemsResponse());
     }
 
     public override Task<ReadItemsResponse> ReadNextQueueItems(ReadNextQueueItemsRequest request, ServerCallContext context)
