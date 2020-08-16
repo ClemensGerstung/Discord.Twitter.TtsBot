@@ -5,7 +5,7 @@ VisualStudioVersion = 16.0.29806.167
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Discord.Twitter.TtsBot", "Bot\Discord.Twitter.TtsBot.csproj", "{6DE56C2C-43E4-4CFE-9FFB-D3CB4A858EFC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebAccess", "WebAccess\WebAccess.csproj", "{014920F3-F685-4ECA-825E-93A3A01AAD0C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "WebAccess", "WebAccess\WebAccess.csproj", "{014920F3-F685-4ECA-825E-93A3A01AAD0C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

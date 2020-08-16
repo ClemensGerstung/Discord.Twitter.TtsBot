@@ -299,27 +299,4 @@ namespace Discord.Twitter.TtsBot
       }
     }
   }
-
-  
-
-  public class Program
-  {
-    static async Task Main(string[] args)
-    {
-      if(args.Length != 1)
-      {
-        return;
-      }
-
-      var logRepository = LogManager.GetRepository(typeof(Program).Assembly);
-      XmlConfigurator.Configure(logRepository, 
-                                new FileInfo("log4net.config"));
-
-      Option option = JsonConvert.DeserializeObject<Option>(File.ReadAllText(args[0]));
-
-      TtsBot bot = new TtsBot(option);
-
-      await bot.RunAsync();
-    }
-  }
 }

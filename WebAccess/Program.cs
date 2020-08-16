@@ -19,7 +19,7 @@ namespace WebAccess
       {
         var httpHandler = new GrpcWebHandler(GrpcWebMode.GrpcWebText, new HttpClientHandler());
 
-        return GrpcChannel.ForAddress("http://localhost:5000/", new GrpcChannelOptions { HttpHandler = httpHandler });
+        return GrpcChannel.ForAddress("https://localhost:50443/", new GrpcChannelOptions { HttpHandler = httpHandler });
       });
 
       await builder.Build().RunAsync();
