@@ -64,7 +64,10 @@ message AddQueueRequest {
 }
 
 message AddQueueResponse {
-  QueueItem item = 1;
+  oneof newItem {
+    QueueItem item = 1;
+    bool isEmpty = 2;
+  }
 }
 
 message GetQueueRequest {

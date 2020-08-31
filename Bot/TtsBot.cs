@@ -1,6 +1,4 @@
 ﻿using System;
-using System.Diagnostics;
-using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
 using Discord.Audio;
@@ -11,19 +9,13 @@ using Tweetinvi.Streaming;
 using TwitterUser = Tweetinvi.Models.IUser;
 using Stream = System.IO.Stream;
 using TwitterStream = Tweetinvi.Stream;
-using Newtonsoft.Json;
 using Tweetinvi.Models;
 using System.Linq;
 using Tweetinvi.Events;
-using System.Runtime.InteropServices;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
-using Discord.Twitter.TtsBot.AdminAccess;
-using Grpc.Core;
 using log4net;
-using log4net.Config;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -60,7 +52,7 @@ namespace Discord.Twitter.TtsBot
       }
       else
       {
-        if(string.IsNullOrWhiteSpace(_option.GoogleApplicationCredentialsPath))
+        if (string.IsNullOrWhiteSpace(_option.GoogleApplicationCredentialsPath))
           throw new ArgumentNullException(nameof(_option.GoogleApplicationCredentialsPath), "Credential path cannot be empty if not using Enviornment Variable \"GOOGLE_APPLICATION_CREDENTIALS\"");
 
         TextToSpeechClientBuilder builder = new TextToSpeechClientBuilder();
@@ -68,9 +60,9 @@ namespace Discord.Twitter.TtsBot
 
         _ttsClient = builder.Build();
       }
-      
+
       _discord = new DiscordSocketClient();
-      
+
       _userCredentials = Auth.CreateCredentials(option.TwitterConsumerKey,
                                                 option.TwitterConsumerSecret,
                                                 option.TwitterUserAccessToken,
@@ -93,10 +85,10 @@ namespace Discord.Twitter.TtsBot
       do
       {
         _playSoundSignal.Wait();
-        if (_currentUser?.VoiceChannel == null) 
+        if (_currentUser?.VoiceChannel == null)
         {
           _playSoundSignal.Reset();
-          return; 
+          return;
         }
 
         IAudioClient client = await _currentUser.VoiceChannel.ConnectAsync();
@@ -160,12 +152,12 @@ namespace Discord.Twitter.TtsBot
       }
 
       string[] arguments = message.Content
-                                  .Split(' ', 
+                                  .Split(' ',
                                          StringSplitOptions.RemoveEmptyEntries)
                                   .Skip(1)
                                   .ToArray();
 
-      if(arguments.Length == 1 &&
+      if (arguments.Length == 1 &&
         arguments[0] == "join")
       {
         var user = message.Author as IGuildUser;
@@ -174,7 +166,7 @@ namespace Discord.Twitter.TtsBot
           _currentUser = user;
           await message.Channel.SendMessageAsync($"Hello {user.Mention}, I'll update you on my awesome tweets!");
         }
-        else if(Equals(_currentUser, user))
+        else if (Equals(_currentUser, user))
         {
           await message.Channel.SendMessageAsync($"I'm already updating you on my tweets, {user.Mention}!");
         }
@@ -184,7 +176,7 @@ namespace Discord.Twitter.TtsBot
         }
       }
 
-      if(arguments.Length == 2 &&
+      if (arguments.Length == 2 &&
         arguments[0] == "update" &&
         int.TryParse(arguments[1], out int count))
       {
@@ -197,12 +189,12 @@ namespace Discord.Twitter.TtsBot
         _playSoundSignal.Set();
       }
 
-      if(arguments.Length == 2 &&
+      if (arguments.Length == 2 &&
         arguments[0] == "read")
       {
         string link = arguments[1];
         Match match = _tweetIdRegex.Match(link);
-        if(long.TryParse(match.Groups["tweetId"].Value, out long id))
+        if (long.TryParse(match.Groups["tweetId"].Value, out long id))
         {
           ITweet tweet = await TweetAsync.GetTweet(id);
           if (tweet.CreatedBy.Id == _twitterUser.Id)
@@ -224,30 +216,23 @@ namespace Discord.Twitter.TtsBot
 
     private async Task GetTweetAudioAsync(string text, Stream destination)
     {
-      SynthesisInput input = new SynthesisInput
-      {
-        Text = text
-      };
-
-      VoiceSelectionParams voice = new VoiceSelectionParams
-      {
-        LanguageCode = _option.LangaugeCode,
-        Name = _option.VoiceName
-      };
-
-      AudioConfig config = new AudioConfig
-      {
-        AudioEncoding = AudioEncoding.Linear16,
-        SampleRateHertz = 48000 * 2
-      };
-
       var response = await _ttsClient.SynthesizeSpeechAsync(new SynthesizeSpeechRequest
       {
-        Input = input,
-        Voice = voice,
-        AudioConfig = config
+        Input = 
+        {
+          Text = text
+        },
+        Voice =
+        {
+          LanguageCode = _option.LangaugeCode,
+          Name = _option.VoiceName
+        },
+        AudioConfig = 
+        {
+          AudioEncoding = AudioEncoding.OggOpus
+        }
       });
-    
+
       response.AudioContent.WriteTo(destination);
     }
 
@@ -258,7 +243,7 @@ namespace Discord.Twitter.TtsBot
         try
         {
           string text = tweet.FullText;
-          if(tweet.IsRetweet)
+          if (tweet.IsRetweet)
           {
             ITweet retweeted = tweet.RetweetedTweet;
             text = retweeted.FullText;
@@ -270,12 +255,12 @@ namespace Discord.Twitter.TtsBot
           }
 
           text = _regex.Replace(text, "");
-          if(string.IsNullOrWhiteSpace(text))
+          if (string.IsNullOrWhiteSpace(text))
           {
             text = "I have posted a link";
           }
 
-          if(tweet.IsRetweet)
+          if (tweet.IsRetweet)
           {
             ITweet retweeted = tweet.RetweetedTweet;
 
@@ -285,7 +270,7 @@ namespace Discord.Twitter.TtsBot
                                  text);
           }
 
-          await GetTweetAudioAsync(text, 
+          await GetTweetAudioAsync(text,
                                    discord);
         }
         catch (Exception exception)

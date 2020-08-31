@@ -1,5 +1,5 @@
 ﻿@page "/counter"
-@inject Grpc.Net.Client.GrpcChannel Channel
+@inject Discord.Twitter.TtsBot.AdminAccess.AdminAccess.AdminAccessClient Client
 
 <h1>Counter</h1>
 
@@ -12,13 +12,8 @@
 
   private async Task IncrementCount()
   {
-    var client = new Discord.Twitter.TtsBot.AdminAccess.AdminAccess.AdminAccessClient(Channel);
     var request = new Discord.Twitter.TtsBot.AdminAccess.ReadItemsRequest();
-    //request.Handle = "realDonaldTrump";
 
-    Grpc.Core.Metadata md = new Grpc.Core.Metadata();
-    //md.
-
-    var response = await client.ReadItemsAsync(request, md);
+    var response = await Client.ReadItemsAsync(request);
   }
 }

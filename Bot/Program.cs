@@ -5,6 +5,8 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.ResponseCompression;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Threading.Tasks;
+using System;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -12,7 +14,7 @@ namespace Discord.Twitter.TtsBot
   {
     public void ConfigureServices(IServiceCollection services)
     {
-      services.AddGrpc();
+      var builder = services.AddGrpc();
       services.AddCors(o => o.AddPolicy("AllowAll", builder =>
       {
         builder.AllowAnyOrigin()
@@ -24,12 +26,6 @@ namespace Discord.Twitter.TtsBot
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
     {
-      if (env.IsDevelopment())
-      {
-        app.UseDeveloperExceptionPage();
-        app.UseWebAssemblyDebugging();
-      }
-
       app.UseRouting();
       app.UseGrpcWeb();
       app.UseCors();
@@ -40,15 +36,25 @@ namespace Discord.Twitter.TtsBot
                  .EnableGrpcWeb()
                  .RequireCors("AllowAll");
       });
+      
     }
   }
 
 
   public class Program
   {
-    public static void Main(string[] args)
+    public static async Task Main(string[] args)
     {
-      CreateHostBuilder(args).Build().Run();
+      using (IHost host = CreateHostBuilder(args).Build())
+      {
+        await host.StartAsync();
+
+        
+
+        Console.ReadLine();
+
+        await host.StopAsync();
+      }
     }
 
     public static IHostBuilder CreateHostBuilder(string[] args) =>

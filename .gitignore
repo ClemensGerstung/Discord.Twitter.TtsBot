@@ -344,3 +344,4 @@ config.json
 launch[Ss]ettings.json
 .vscode/
 /WebAccess/wwwroot
+/Bot/tts-auth.json

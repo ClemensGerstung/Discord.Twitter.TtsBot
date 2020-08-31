@@ -1,6 +1,7 @@
 using System;
 using System.Net.Http;
 using System.Threading.Tasks;
+using Discord.Twitter.TtsBot.AdminAccess;
 using Grpc.Net.Client;
 using Grpc.Net.Client.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
@@ -12,6 +13,8 @@ namespace WebAccess
   {
     public static async Task Main(string[] args)
     {
+      GrpcChannel channel = null;
+
       var builder = WebAssemblyHostBuilder.CreateDefault(args);
       builder.RootComponents.Add<App>("app");
 
@@ -19,10 +22,13 @@ namespace WebAccess
       {
         var httpHandler = new GrpcWebHandler(GrpcWebMode.GrpcWebText, new HttpClientHandler());
 
-        return GrpcChannel.ForAddress("https://localhost:50443/", new GrpcChannelOptions { HttpHandler = httpHandler });
+        channel = GrpcChannel.ForAddress("https://localhost:50443/", new GrpcChannelOptions { HttpHandler = httpHandler });
+        
+        return new AdminAccess.AdminAccessClient(channel);
       });
 
       await builder.Build().RunAsync();
+      await channel?.ShutdownAsync();
     }
   }
 }

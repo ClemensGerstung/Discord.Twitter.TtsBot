@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Tweetinvi;
 using Tweetinvi.Models;
@@ -24,15 +25,30 @@ namespace Discord.Twitter.TtsBot
     }
   }
 
+  public class UserAddedEventArgs : EventArgs
+  {
+    public string ScreenName { get; }
+
+    public long UserId { get; }
+
+    public UserAddedEventArgs(long userId, string screenName)
+    {
+      ScreenName = screenName;
+      UserId = userId;
+    }
+  }
+
   public class Impl : AdminAccess.AdminAccess.AdminAccessBase
   {
     private readonly IDictionary<long, TwitterUser> _users = new ConcurrentDictionary<long, TwitterUser>();
     private readonly ConcurrentDictionary<long, QueueItem> _items = new ConcurrentDictionary<long, QueueItem>();
     private readonly ConcurrentQueue<long> _queue = new ConcurrentQueue<long>();
+    private readonly Regex _urlRegex = new Regex(@"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)");
 
     public ICollection<TwitterUser> Users => _users.Values;
 
     public event EventHandler<ReadItemEventArgs> ReadItem;
+    public event EventHandler<UserAddedEventArgs> UserAdded;
 
     public override async Task<AddQueueResponse> AddQueueItem(AddQueueRequest request, ServerCallContext context)
     {
@@ -42,14 +58,14 @@ namespace Discord.Twitter.TtsBot
       switch (request.NewItemCase)
       {
         case AddQueueRequest.NewItemOneofCase.Item:
-          item = request.Item;
+          response.Item = request.Item;
           break;
         case AddQueueRequest.NewItemOneofCase.TweetId:
           ITweet tweet = await TweetAsync.GetTweet(request.TweetId);
           item = new QueueItem();
           item.TweetId = tweet.Id;
           item.Played = 0;
-          
+
           string text = tweet.FullText;
           if (tweet.IsRetweet)
           {
@@ -57,18 +73,31 @@ namespace Discord.Twitter.TtsBot
             text = retweeted.FullText;
           }
 
-          if(tweet.QuotedTweet != null)
+          if (tweet.QuotedTweet != null)
           {
-
+            ITweet quoted = tweet.QuotedTweet;
+            text = quoted.FullText;
           }
 
+          text = _urlRegex.Replace(text, "");
+          if (string.IsNullOrWhiteSpace(text))
+          {
+            response.IsEmpty = true;
+            break;
+          }
+
+
+
+          response.Item = item;
           break;
       }
 
-      _queue.Enqueue(item.TweetId);
-      _items.AddOrUpdate(item.TweetId, item, (id, old) => item);
+      if (!response.IsEmpty)
+      {
+        _queue.Enqueue(item.TweetId);
+        _items.AddOrUpdate(item.TweetId, item, (id, old) => item);
+      }
 
-      response.Item = item;
       return response;
     }
 
@@ -81,10 +110,12 @@ namespace Discord.Twitter.TtsBot
       GetTwitterUserResponse response = await GetTwitterUser(twitterUserRequest, null);
       var user = response.User;
 
-      if(!_users.ContainsKey(user.Id))
+      if (!_users.ContainsKey(user.Id))
       {
         _users.Add(user.Id, user);
       }
+
+      UserAdded?.Invoke(this, new UserAddedEventArgs(user.Id, user.Handle));
 
       return response;
     }
@@ -172,7 +203,7 @@ namespace Discord.Twitter.TtsBot
 
       for (int i = 0; i < request.Count; i++)
       {
-        if(_queue.TryDequeue(out long id) &&
+        if (_queue.TryDequeue(out long id) &&
           _items.TryGetValue(id, out QueueItem item))
         {
           readRequest.QueueItems.Add(item);
