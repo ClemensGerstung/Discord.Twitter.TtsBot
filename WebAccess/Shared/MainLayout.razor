@@ -1,15 +1,26 @@
 ﻿@inherits LayoutComponentBase
 
-<div class="sidebar">
-    <NavMenu />
-</div>
+<MatThemeProvider Theme="@theme1">
+  <MatAppBarContainer>
+    <MatAppBar Fixed="true">
+      <MatAppBarRow>
+        <MatAppBarSection>
+          <MatAppBarTitle>Discord.Twitter.TtsBot</MatAppBarTitle>
+        </MatAppBarSection>
+      </MatAppBarRow>
+    </MatAppBar>
 
-<div class="main">
-    <div class="top-row px-4">
-        <a href="http://blazor.net" target="_blank" class="ml-md-auto">About</a>
-    </div>
+    <MatAppBarContent>
+      @Body
+    </MatAppBarContent>
+  </MatAppBarContainer>
+</MatThemeProvider>
 
-    <div class="content px-4">
-        @Body
-    </div>
-</div>
+@code
+{
+  MatTheme theme1 = new MatTheme()
+  {
+    Primary = MatThemeColors.Blue._700.Value,
+    Secondary = MatThemeColors.BlueGrey._500.Value
+  };
+}

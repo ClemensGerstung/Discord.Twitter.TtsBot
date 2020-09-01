@@ -16,6 +16,8 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using log4net;
+using CliWrap;
+using System.IO;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -29,17 +31,22 @@ namespace Discord.Twitter.TtsBot
     private TextToSpeechClient _ttsClient;
     private ITwitterCredentials _userCredentials;
     private IGuildUser _currentUser;
-    private TwitterUser _twitterUser;
     private ConcurrentQueue<ITweet> _queue;
     private ManualResetEventSlim _playSoundSignal;
     private Regex _regex;
     private Regex _tweetIdRegex;
+    private AdminAccess.AdminAccess.AdminAccessClient _grpcClient;
+
+    private IFilteredStream _stream;
+    private Task<Task> _twitterStreamTask;
+    private Task _playSoundTask;
 
     public Exception Exception { get; private set; }
 
-    public TtsBot(Option option)
+    public TtsBot(Option option, AdminAccess.AdminAccess.AdminAccessClient grpcClient)
     {
       _option = option ?? throw new ArgumentNullException(nameof(option));
+      _grpcClient = grpcClient ?? throw new ArgumentNullException(nameof(grpcClient));
       _finalizeSignal = new ManualResetEventSlim(false);
       _playSoundSignal = new ManualResetEventSlim(false);
       _queue = new ConcurrentQueue<ITweet>();
@@ -69,26 +76,24 @@ namespace Discord.Twitter.TtsBot
                                                 option.TwitterUserAccessSecret);
       Auth.SetCredentials(_userCredentials);
 
-      Console.CancelKeyPress += OnCancelKeyPressed;
-    }
-
-    private void OnCancelKeyPressed(object sender, ConsoleCancelEventArgs e)
-    {
-      __log.Info("Received Cancel, cleaning up");
-
-      _finalizeSignal.Set();
-      e.Cancel = true;
+      _stream = TwitterStream.CreateFilteredStream(_userCredentials, TweetMode.Extended);
+      _stream.MatchingTweetReceived += OnMatchingTweetReceived;
     }
 
     private async Task PlayTweetAsync()
     {
+      // kick off to different thread
+      await Task.Delay(1);
+
       do
       {
         _playSoundSignal.Wait();
+        if (_finalizeSignal.IsSet) break;
+
         if (_currentUser?.VoiceChannel == null)
         {
           _playSoundSignal.Reset();
-          return;
+          continue;
         }
 
         IAudioClient client = await _currentUser.VoiceChannel.ConnectAsync();
@@ -97,51 +102,61 @@ namespace Discord.Twitter.TtsBot
         {
           if (_queue.TryDequeue(out ITweet tweet))
           {
-            await PlayTweetAsync(client, tweet);
+            //await PlayTweetAsync(client, tweet);
           }
 
           if (_finalizeSignal.IsSet) break;
         } while (!_queue.IsEmpty);
 
-        await _currentUser.VoiceChannel.DisconnectAsync();
+
         _playSoundSignal.Reset();
 
       } while (!_finalizeSignal.IsSet);
     }
 
-    public async Task RunAsync()
+    public async Task StartAsync()
     {
-      try
-      {
-        _discord.MessageReceived += OnDiscordMessageReceived;
-        await _discord.LoginAsync(TokenType.Bot, _option.DiscordToken);
-        await _discord.StartAsync();
+      using ManualResetEventSlim streamStartedEvent = new ManualResetEventSlim(false);
+      _discord.MessageReceived += OnDiscordMessageReceived;
+      await _discord.LoginAsync(TokenType.Bot, _option.DiscordToken);
+      await _discord.StartAsync();
 
-        _twitterUser = User.GetUserFromScreenName(_option.FollowTwitterUser);
+      _stream.StreamStarted += OnStreamStarted;
+      _twitterStreamTask = Task.Factory.StartNew(_stream.StartStreamMatchingAnyConditionAsync,
+                                              CancellationToken.None,
+                                              TaskCreationOptions.LongRunning,
+                                              TaskScheduler.Default);
+      streamStartedEvent.Wait();
 
-        IFilteredStream stream = TwitterStream.CreateFilteredStream(_userCredentials, TweetMode.Extended);
-        stream.AddFollow(_twitterUser.Id);
-        stream.MatchingTweetReceived += OnMatchingTweetReceived;
-        Thread thread = new Thread(stream.StartStreamMatchingAllConditions);
-        thread.Name = "TwitterStream";
-        thread.Start();
+      _playSoundTask = PlayTweetAsync();
 
-        Thread playThread = new Thread(PlayTweetAsync().Wait);
-        playThread.Name = "PlaySoundThread";
-        playThread.Start();
+      void OnStreamStarted(object sender, EventArgs args) => streamStartedEvent.Set();
+    }
 
-        _finalizeSignal.Wait();
-        stream.StopStream();
-        thread.Join();
-        playThread.Join();
+    public async Task ShutdownAsync()
+    {
+      _finalizeSignal.Set();
+      _playSoundSignal.Set();
 
-        await _discord.StopAsync();
-        await _discord.LogoutAsync();
-      }
-      catch (Exception exception)
-      {
-        Exception = exception;
-      }
+      _stream.StopStream();
+      await _twitterStreamTask;
+
+      await _playSoundTask;
+
+      await _discord.StopAsync();
+      await _discord.LogoutAsync();
+    }
+
+    internal async Task<IAudioClient> BeginSoundAsync()
+    {
+      if (_currentUser == null) return null;
+
+      return await _currentUser.VoiceChannel.ConnectAsync();
+    }
+
+    internal async Task EndSoundAsync()
+    {
+      await _currentUser.VoiceChannel.DisconnectAsync();
     }
 
     private async Task OnDiscordMessageReceived(SocketMessage message)
@@ -176,111 +191,96 @@ namespace Discord.Twitter.TtsBot
         }
       }
 
-      if (arguments.Length == 2 &&
-        arguments[0] == "update" &&
-        int.TryParse(arguments[1], out int count))
-      {
-        // todo: check if count > 200
-        IEnumerable<ITweet> tweets = await _twitterUser.GetUserTimelineAsync(count);
-        foreach (ITweet tweet in tweets)
-        {
-          _queue.Enqueue(tweet);
-        }
-        _playSoundSignal.Set();
-      }
+      //if (arguments.Length == 2 &&
+      //  arguments[0] == "update" &&
+      //  int.TryParse(arguments[1], out int count))
+      //{
+      //  // todo: check if count > 200
+      //  IEnumerable<ITweet> tweets = await _twitterUser.GetUserTimelineAsync(count);
+      //  foreach (ITweet tweet in tweets)
+      //  {
+      //    _queue.Enqueue(tweet);
+      //  }
+      //  _playSoundSignal.Set();
+      //}
 
-      if (arguments.Length == 2 &&
-        arguments[0] == "read")
-      {
-        string link = arguments[1];
-        Match match = _tweetIdRegex.Match(link);
-        if (long.TryParse(match.Groups["tweetId"].Value, out long id))
-        {
-          ITweet tweet = await TweetAsync.GetTweet(id);
-          if (tweet.CreatedBy.Id == _twitterUser.Id)
-          {
-            _queue.Enqueue(tweet);
-            _playSoundSignal.Set();
-          }
-        }
-      }
+      //if (arguments.Length == 2 &&
+      //  arguments[0] == "read")
+      //{
+      //  string link = arguments[1];
+      //  Match match = _tweetIdRegex.Match(link);
+      //  if (long.TryParse(match.Groups["tweetId"].Value, out long id))
+      //  {
+      //    ITweet tweet = await TweetAsync.GetTweet(id);
+      //    if (tweet.CreatedBy.Id == _twitterUser.Id)
+      //    {
+      //      _queue.Enqueue(tweet);
+      //      _playSoundSignal.Set();
+      //    }
+      //  }
+      //}
     }
 
     private void OnMatchingTweetReceived(object sender, MatchedTweetReceivedEventArgs args)
     {
-      if (args.Tweet.CreatedBy.Id != _twitterUser.Id) return;
+      //if (args.Tweet.CreatedBy.Id != _twitterUser.Id) return;
 
       _queue.Enqueue(args.Tweet);
       _playSoundSignal.Set();
     }
 
-    private async Task GetTweetAudioAsync(string text, Stream destination)
+    private async Task GetTweetAudioAsync(string text, string voiceName, string languageCode, Stream destination)
     {
-      var response = await _ttsClient.SynthesizeSpeechAsync(new SynthesizeSpeechRequest
+      string args = "-hide_banner -loglevel panic -i pipe:0 -ac 2 -f s16le -ar 48000 pipe:1";
+      //string args = "-hide_banner -loglevel panic -i pipe:0 -ac 2 -f mp3 -ar 48000 pipe:1";
+      var request = new SynthesizeSpeechRequest
       {
-        Input = 
+        Input = new SynthesisInput
         {
           Text = text
         },
-        Voice =
+        Voice = new VoiceSelectionParams
         {
-          LanguageCode = _option.LangaugeCode,
-          Name = _option.VoiceName
+          LanguageCode = languageCode,
+          Name = voiceName
         },
-        AudioConfig = 
+        AudioConfig = new AudioConfig
         {
           AudioEncoding = AudioEncoding.OggOpus
         }
-      });
+      };
 
-      response.AudioContent.WriteTo(destination);
+      var response = await _ttsClient.SynthesizeSpeechAsync(request);
+
+      using MemoryStream audioContent = new MemoryStream();
+      response.AudioContent.WriteTo(audioContent);
+
+      audioContent.Seek(0, SeekOrigin.Begin);
+      await (audioContent | Cli.Wrap("ffmpeg.exe").WithArguments(args) | destination).ExecuteAsync();
     }
 
-    private async Task PlayTweetAsync(IAudioClient client, ITweet tweet)
+    internal async Task PlayTweetAsync(IAudioClient client, string text, string voiceName, string languageCode)
     {
-      using (Stream discord = client.CreatePCMStream(AudioApplication.Mixed))
+      using Stream discord = client.CreatePCMStream(AudioApplication.Mixed);
+      using MemoryStream buffer = new MemoryStream();
+
+      try
       {
-        try
-        {
-          string text = tweet.FullText;
-          if (tweet.IsRetweet)
-          {
-            ITweet retweeted = tweet.RetweetedTweet;
-            text = retweeted.FullText;
-          }
+        await GetTweetAudioAsync(text,
+                                 voiceName,
+                                 languageCode,
+                                 buffer);
 
-          foreach (var user in tweet.UserMentions)
-          {
-            text = text.Replace("@" + user.ScreenName, user.Name);
-          }
-
-          text = _regex.Replace(text, "");
-          if (string.IsNullOrWhiteSpace(text))
-          {
-            text = "I have posted a link";
-          }
-
-          if (tweet.IsRetweet)
-          {
-            ITweet retweeted = tweet.RetweetedTweet;
-
-            text = string.Format("I, {0}, retweeted {1}'s tweet: {2}",
-                                 tweet.CreatedBy.Name,
-                                 retweeted.CreatedBy.Name,
-                                 text);
-          }
-
-          await GetTweetAudioAsync(text,
-                                   discord);
-        }
-        catch (Exception exception)
-        {
-          __log.Error(exception);
-        }
-        finally
-        {
-          await discord.FlushAsync();
-        }
+        buffer.Seek(0, SeekOrigin.Begin);
+        await buffer.CopyToAsync(discord);
+      }
+      catch (Exception exception)
+      {
+        __log.Error(exception);
+      }
+      finally
+      {
+        await discord.FlushAsync();
       }
     }
   }

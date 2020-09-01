@@ -22,7 +22,7 @@ namespace WebAccess
       {
         var httpHandler = new GrpcWebHandler(GrpcWebMode.GrpcWebText, new HttpClientHandler());
 
-        channel = GrpcChannel.ForAddress("https://localhost:50443/", new GrpcChannelOptions { HttpHandler = httpHandler });
+        channel = GrpcChannel.ForAddress("http://localhost:50080/", new GrpcChannelOptions { HttpHandler = httpHandler });
         
         return new AdminAccess.AdminAccessClient(channel);
       });

@@ -1,5 +1,6 @@
 ﻿using Discord.Twitter.TtsBot.AdminAccess;
 using Grpc.Core;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -38,17 +39,43 @@ namespace Discord.Twitter.TtsBot
     }
   }
 
-  public class Impl : AdminAccess.AdminAccess.AdminAccessBase
+  public class Impl : AdminAccess.AdminAccess.AdminAccessBase, 
+                      IDisposable
   {
     private readonly IDictionary<long, TwitterUser> _users = new ConcurrentDictionary<long, TwitterUser>();
     private readonly ConcurrentDictionary<long, QueueItem> _items = new ConcurrentDictionary<long, QueueItem>();
     private readonly ConcurrentQueue<long> _queue = new ConcurrentQueue<long>();
     private readonly Regex _urlRegex = new Regex(@"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)");
 
+    private readonly ILogger<Impl> _logger;
+    private readonly TtsBot _bot;
+
     public ICollection<TwitterUser> Users => _users.Values;
 
-    public event EventHandler<ReadItemEventArgs> ReadItem;
     public event EventHandler<UserAddedEventArgs> UserAdded;
+
+    public Impl(ILogger<Impl> logger, TtsBot bot)
+    {
+      _logger = logger;
+      _bot = bot;
+    }
+
+
+    ~Impl()
+    {
+      this.Dispose(false);
+    }
+
+    public void Dispose()
+    {
+      Dispose(true);
+      GC.SuppressFinalize(this);
+    }
+
+    protected virtual void Dispose(bool disposing)
+    {
+      
+    }
 
     public override async Task<AddQueueResponse> AddQueueItem(AddQueueRequest request, ServerCallContext context)
     {
@@ -86,7 +113,7 @@ namespace Discord.Twitter.TtsBot
             break;
           }
 
-
+          item.Content = text;
 
           response.Item = item;
           break;
@@ -179,22 +206,24 @@ namespace Discord.Twitter.TtsBot
       return respone;
     }
 
-    public override Task<ReadItemsResponse> ReadItems(ReadItemsRequest request, ServerCallContext context)
+    public override async Task<ReadItemsResponse> ReadItems(ReadItemsRequest request, ServerCallContext context)
     {
       ReadItemsResponse response = new ReadItemsResponse();
 
+      var audioClient = await _bot.BeginSoundAsync();
       foreach (var item in request.QueueItems)
       {
         var old = _items.GetOrAdd(item.TweetId, item);
-        ReadItem?.Invoke(this, new ReadItemEventArgs(item.Content));
+        await _bot.PlayTweetAsync(audioClient, item.Content, "en-IN-Wavenet-C", "en-US");
 
         item.Played++;
         _items.TryUpdate(item.TweetId, item, old);
 
         response.QueueItems.Add(item);
       }
+      await _bot.EndSoundAsync();
 
-      return Task.FromResult(response);
+      return response;
     }
 
     public override Task<ReadItemsResponse> ReadNextQueueItems(ReadNextQueueItemsRequest request, ServerCallContext context)

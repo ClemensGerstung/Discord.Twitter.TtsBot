@@ -7,6 +7,8 @@ using System.Linq;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using System.Threading.Tasks;
 using System;
+using Newtonsoft.Json;
+using System.IO;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -15,6 +17,21 @@ namespace Discord.Twitter.TtsBot
     public void ConfigureServices(IServiceCollection services)
     {
       var builder = services.AddGrpc();
+      services.AddGrpcClient<AdminAccess.AdminAccess.AdminAccessClient>(o =>
+      {
+        o.Address = new Uri("http://localhost:50080/");
+      });
+      services.AddSingleton(serviceProvider =>
+      {
+        var grpcClient = serviceProvider.GetService<AdminAccess.AdminAccess.AdminAccessClient>();
+
+        Option option = JsonConvert.DeserializeObject<Option>(File.ReadAllText("config.json"));
+        var bot = new TtsBot(option, grpcClient);
+        bot.StartAsync().GetAwaiter().GetResult();
+
+        return bot;
+      });
+
       services.AddCors(o => o.AddPolicy("AllowAll", builder =>
       {
         builder.AllowAnyOrigin()
@@ -36,10 +53,8 @@ namespace Discord.Twitter.TtsBot
                  .EnableGrpcWeb()
                  .RequireCors("AllowAll");
       });
-      
     }
   }
-
 
   public class Program
   {
@@ -48,23 +63,28 @@ namespace Discord.Twitter.TtsBot
       using (IHost host = CreateHostBuilder(args).Build())
       {
         await host.StartAsync();
-
         
-
         Console.ReadLine();
+
+        var bot = host.Services.GetService<TtsBot>();
+        await bot.ShutdownAsync();
 
         await host.StopAsync();
       }
     }
 
-    public static IHostBuilder CreateHostBuilder(string[] args) =>
-        Host.CreateDefaultBuilder(args)
-            .ConfigureWebHostDefaults(webBuilder =>
-            {
-              webBuilder.UseStartup<Startup>();
-              webBuilder.UseUrls("http://*:50080");
-              webBuilder.UseUrls("https://*:50443");
-            });
+    public static IHostBuilder CreateHostBuilder(string[] args)
+    {
+      IHostBuilder builder = Host.CreateDefaultBuilder(args)
+                                 .ConfigureWebHostDefaults(webBuilder =>
+                                 {
+                                   webBuilder.UseStartup<Startup>();
+                                   webBuilder.UseUrls("http://*:50080");
+                                   //webBuilder.UseUrls("https://*:50443");
+                                 });
+
+      return builder;
+    }
 
 
     //static async Task Main(string[] args)
