@@ -214,7 +214,7 @@ namespace Discord.Twitter.TtsBot
       foreach (var item in request.QueueItems)
       {
         var old = _items.GetOrAdd(item.TweetId, item);
-        await _bot.PlayTweetAsync(audioClient, item.Content, "en-IN-Wavenet-C", "en-US");
+        await _bot.PlayTweetAsync(audioClient, item.Content, "en-US-Wavenet-C", "en-US");
 
         item.Played++;
         _items.TryUpdate(item.TweetId, item, old);
