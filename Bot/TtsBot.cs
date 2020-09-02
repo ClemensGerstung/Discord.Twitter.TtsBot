@@ -6,51 +6,54 @@ using Discord.WebSocket;
 using Google.Cloud.TextToSpeech.V1;
 using Tweetinvi;
 using Tweetinvi.Streaming;
-using TwitterUser = Tweetinvi.Models.IUser;
 using Stream = System.IO.Stream;
 using TwitterStream = Tweetinvi.Stream;
 using Tweetinvi.Models;
 using System.Linq;
 using Tweetinvi.Events;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using log4net;
 using CliWrap;
 using System.IO;
+using Discord.Twitter.TtsBot.AdminAccess;
 
 namespace Discord.Twitter.TtsBot
 {
+  public class UserAddedEventArgs : EventArgs
+  {
+    public string ScreenName { get; }
+
+    public long UserId { get; }
+
+    public UserAddedEventArgs(long userId, string screenName)
+    {
+      ScreenName = screenName;
+      UserId = userId;
+    }
+  }
+
   public class TtsBot
   {
     private ILog __log = LogManager.GetLogger(typeof(TtsBot));
 
-    private ManualResetEventSlim _finalizeSignal;
     private Option _option;
     private DiscordSocketClient _discord;
     private TextToSpeechClient _ttsClient;
     private ITwitterCredentials _userCredentials;
     private IGuildUser _currentUser;
-    private ConcurrentQueue<ITweet> _queue;
-    private ManualResetEventSlim _playSoundSignal;
-    private Regex _regex;
     private Regex _tweetIdRegex;
     private AdminAccess.AdminAccess.AdminAccessClient _grpcClient;
+    private DataStore _store;
 
     private IFilteredStream _stream;
-    private Task<Task> _twitterStreamTask;
-    private Task _playSoundTask;
+    private Task _twitterStreamTask;
 
-    public Exception Exception { get; private set; }
-
-    public TtsBot(Option option, AdminAccess.AdminAccess.AdminAccessClient grpcClient)
+    public TtsBot(Option option, AdminAccess.AdminAccess.AdminAccessClient grpcClient, DataStore store)
     {
       _option = option ?? throw new ArgumentNullException(nameof(option));
       _grpcClient = grpcClient ?? throw new ArgumentNullException(nameof(grpcClient));
-      _finalizeSignal = new ManualResetEventSlim(false);
-      _playSoundSignal = new ManualResetEventSlim(false);
-      _queue = new ConcurrentQueue<ITweet>();
-      _regex = new Regex(@"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)");
+      _store = store ?? throw new ArgumentNullException(nameof(store));
       _tweetIdRegex = new Regex(@"\/(?<tweetId>\d+)");
 
       if (option.GoogleUseEnvironmentVariable)
@@ -78,40 +81,17 @@ namespace Discord.Twitter.TtsBot
 
       _stream = TwitterStream.CreateFilteredStream(_userCredentials, TweetMode.Extended);
       _stream.MatchingTweetReceived += OnMatchingTweetReceived;
+
+      _store.UserAdded += OnUserAddedToDataStore;
     }
 
-    private async Task PlayTweetAsync()
+    private void OnUserAddedToDataStore(object sender, UserAddedEventArgs args)
     {
-      // kick off to different thread
-      await Task.Delay(1);
+      _stream.PauseStream();
 
-      do
-      {
-        _playSoundSignal.Wait();
-        if (_finalizeSignal.IsSet) break;
+      _stream.AddFollow(args.UserId);
 
-        if (_currentUser?.VoiceChannel == null)
-        {
-          _playSoundSignal.Reset();
-          continue;
-        }
-
-        IAudioClient client = await _currentUser.VoiceChannel.ConnectAsync();
-
-        do
-        {
-          if (_queue.TryDequeue(out ITweet tweet))
-          {
-            //await PlayTweetAsync(client, tweet);
-          }
-
-          if (_finalizeSignal.IsSet) break;
-        } while (!_queue.IsEmpty);
-
-
-        _playSoundSignal.Reset();
-
-      } while (!_finalizeSignal.IsSet);
+      _stream.ResumeStream();
     }
 
     public async Task StartAsync()
@@ -122,41 +102,34 @@ namespace Discord.Twitter.TtsBot
       await _discord.StartAsync();
 
       _stream.StreamStarted += OnStreamStarted;
-      _twitterStreamTask = Task.Factory.StartNew(_stream.StartStreamMatchingAnyConditionAsync,
-                                              CancellationToken.None,
-                                              TaskCreationOptions.LongRunning,
-                                              TaskScheduler.Default);
+      _twitterStreamTask = Task.Factory.StartNew(_stream.StartStreamMatchingAnyCondition,
+                                                 CancellationToken.None,
+                                                 TaskCreationOptions.LongRunning,
+                                                 TaskScheduler.Default);
       streamStartedEvent.Wait();
-
-      _playSoundTask = PlayTweetAsync();
 
       void OnStreamStarted(object sender, EventArgs args) => streamStartedEvent.Set();
     }
 
     public async Task ShutdownAsync()
     {
-      _finalizeSignal.Set();
-      _playSoundSignal.Set();
-
       _stream.StopStream();
       await _twitterStreamTask;
-
-      await _playSoundTask;
 
       await _discord.StopAsync();
       await _discord.LogoutAsync();
     }
 
-    internal async Task<IAudioClient> BeginSoundAsync()
+    internal Task<IAudioClient> BeginSoundAsync()
     {
       if (_currentUser == null) return null;
 
-      return await _currentUser.VoiceChannel.ConnectAsync();
+      return _currentUser.VoiceChannel.ConnectAsync();
     }
 
-    internal async Task EndSoundAsync()
+    internal Task EndSoundAsync()
     {
-      await _currentUser.VoiceChannel.DisconnectAsync();
+      return _currentUser.VoiceChannel.DisconnectAsync();
     }
 
     private async Task OnDiscordMessageReceived(SocketMessage message)
@@ -223,16 +196,18 @@ namespace Discord.Twitter.TtsBot
 
     private void OnMatchingTweetReceived(object sender, MatchedTweetReceivedEventArgs args)
     {
-      //if (args.Tweet.CreatedBy.Id != _twitterUser.Id) return;
-
-      _queue.Enqueue(args.Tweet);
-      _playSoundSignal.Set();
+      if(_store.UserTracked(args.Tweet.CreatedBy.Id))
+      {
+        var request = new AddQueueRequest();
+        request.TweetId = args.Tweet.Id;
+        var response = _grpcClient.AddQueueItem(request);
+        // todo: request read of new item
+      }
     }
 
     private async Task GetTweetAudioAsync(string text, string voiceName, string languageCode, Stream destination)
     {
       string args = "-hide_banner -loglevel panic -i pipe:0 -ac 2 -f s16le -ar 48000 pipe:1";
-      //string args = "-hide_banner -loglevel panic -i pipe:0 -ac 2 -f mp3 -ar 48000 pipe:1";
       var request = new SynthesizeSpeechRequest
       {
         Input = new SynthesisInput

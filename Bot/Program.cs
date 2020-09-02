@@ -21,13 +21,14 @@ namespace Discord.Twitter.TtsBot
       {
         o.Address = new Uri("http://localhost:50080/");
       });
+      services.AddSingleton(new DataStore());
       services.AddSingleton(serviceProvider =>
       {
         var grpcClient = serviceProvider.GetService<AdminAccess.AdminAccess.AdminAccessClient>();
+        var dataStore = serviceProvider.GetService<DataStore>();
 
         Option option = JsonConvert.DeserializeObject<Option>(File.ReadAllText("config.json"));
         var bot = new TtsBot(option, grpcClient);
-        bot.StartAsync().GetAwaiter().GetResult();
 
         return bot;
       });
@@ -62,14 +63,14 @@ namespace Discord.Twitter.TtsBot
     {
       using (IHost host = CreateHostBuilder(args).Build())
       {
+        var bot = host.Services.GetService<TtsBot>();
+        await bot.StartAsync();
         await host.StartAsync();
         
         Console.ReadLine();
 
-        var bot = host.Services.GetService<TtsBot>();
-        await bot.ShutdownAsync();
-
         await host.StopAsync();
+        await bot.ShutdownAsync();
       }
     }
 

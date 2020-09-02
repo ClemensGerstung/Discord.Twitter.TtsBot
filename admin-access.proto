@@ -6,7 +6,7 @@ package discord.twitter.ttsBot.adminAccess;
 
 service AdminAccess {
   rpc GetTwitterUser (GetTwitterUserRequest) returns (GetTwitterUserResponse);
-  rpc AddTwitterUser (AddTwitterUserRequest) returns (GetTwitterUserResponse);
+  rpc AddTwitterUser (GetTwitterUserRequest) returns (GetTwitterUserResponse);
   rpc GetAllTwitterUsers (GetAllTwitterUserRequest) returns (GetAllTwitterUserRespone);
 
   rpc AddQueueItem (AddQueueRequest) returns (AddQueueResponse);
@@ -36,20 +36,13 @@ message GetAllTwitterUserRespone {
   repeated TwitterUser users = 1;
 }
 
-message AddTwitterUserRequest {
+message GetTwitterUserRequest {
   oneof user {
     int64 id = 1;
     string handle = 2;
   }
   string language = 3;
   string voiceName = 4;
-}
-
-message GetTwitterUserRequest {
-  oneof user {
-    int64 id = 1;
-    string handle = 2;
-  }
 }
 
 message GetTwitterUserResponse {
@@ -86,11 +79,13 @@ message QueueItem {
   TwitterUser user = 2;
   string content = 3;
   google.protobuf.Timestamp created = 4;
-  uint32 played = 5;
+  int32 played = 5;
 }
 
 message TwitterUser {
   int64 id = 1;
   string handle = 2;
   string name = 3;
+  string language = 4;
+  string voiceName = 5;
 }

@@ -24,6 +24,8 @@
           <MatButton OnClick="@OnClick">Button</MatButton>
 
           <MatButton OnClick="@OnPlayClick">Play</MatButton>
+
+          <MatButton OnClick="@OnAddUserClick">Add User</MatButton>
         </div>
       </div>
     </div>
@@ -93,5 +95,13 @@
     ReadItemsRequest readRequest = new ReadItemsRequest();
     readRequest.QueueItems.Add(_queueItem);
     var readResponse = await Client.ReadItemsAsync(readRequest);
+  }
+
+  public async Task OnAddUserClick(MouseEventArgs e)
+  {
+    var request = new GetTwitterUserRequest();
+    request.Handle = "realDonaldTrump";
+
+    var response = await Client.GetTwitterUserAsync(request);
   }
 }
