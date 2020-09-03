@@ -198,10 +198,12 @@ namespace Discord.Twitter.TtsBot
     {
       if(_store.UserTracked(args.Tweet.CreatedBy.Id))
       {
-        var request = new AddQueueRequest();
-        request.TweetId = args.Tweet.Id;
+        var request = new AddQueueRequest
+        {
+          TweetId = args.Tweet.Id
+        };
         var response = _grpcClient.AddQueueItem(request);
-        // todo: request read of new item
+        var readResponse = _grpcClient.ReadNextQueueItems(new ReadNextQueueItemsRequest());
       }
     }
 

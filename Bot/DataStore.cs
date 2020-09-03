@@ -60,6 +60,8 @@ namespace Discord.Twitter.TtsBot
 
     public IEnumerable<QueueItem> GetNextQueueItems(int count)
     {
+      if (count == 0) count = _queue.Count;
+
       for (int i = 0; i < count; i++)
       {
         if (_queue.TryDequeue(out long id) &&
