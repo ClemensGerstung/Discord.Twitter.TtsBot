@@ -1,63 +1,34 @@
 ﻿@page "/"
+@using System.Net.WebSockets
+@using System.Text
+@using System.Threading
+@using Google.Protobuf
+@using System.IO 
+@implements IDisposable
 @inject AdminAccess.AdminAccessClient Client
-
-<style>
-  .demo-mat-card {
-    max-width: 400px;
-    margin-bottom: 5px;
-  }
-
-  .demo-mat-card-content {
-    padding: 1rem;
-  }
-
-  .demo-mat-card-clean-margin {
-    margin: 0px;
-  }
-</style>
 
 <div class="mat-layout-grid">
   <div class="mat-layout-grid-inner">
     <div class="mat-layout-grid-cell">
       <div class="mat-layout-grid-inner">
         <div class="mat-layout-grid-cell">
-          <MatButton OnClick="@OnClick">Button</MatButton>
+          <MatButton OnClick="@OnNormalClick">Normal Tweet</MatButton>
+          <MatButton OnClick="@OnRetweetedClick">Retweetet Tweet</MatButton>
+          <MatButton OnClick="@OnQuotedClick">Quoted Tweet</MatButton>
 
           <MatButton OnClick="@OnPlayClick">Play</MatButton>
 
           <MatButton OnClick="@OnAddUserClick">Add User</MatButton>
+          <MatButton OnClick="@OnLoadUsersAsync">Load Users</MatButton>
+
+          <MatButton OnClick="@OnWebSocketConnect">UseWebSocket</MatButton>
         </div>
       </div>
     </div>
     <div class="mat-layout-grid-cell">
       <MatVirtualScroll Items="@Items" ItemHeight="350" style="height: 100%">
         <ItemTemplate>
-          <MatCard class="demo-mat-card">
-            <MatCardContent>
-              <div class="demo-mat-card-content">
-                <MatHeadline6 class="demo-mat-card-clean-margin">
-                  @context.DisplayName
-                </MatHeadline6>
-                <MatSubtitle2 class="demo-mat-card-clean-margin">
-                  by @context.UserName (@((DateTime.Now - context.Created).TotalHours.ToString("N0")) ago)
-                </MatSubtitle2>
-              </div>
-
-              <MatBody2 class="demo-mat-card-content demo-mat-card-clean-margin">
-                @context.Text
-              </MatBody2>
-            </MatCardContent>
-            <MatCardActions>
-              <MatCardActionButtons>
-                <MatButton>Read</MatButton>
-                <MatButton>Bookmark</MatButton>
-              </MatCardActionButtons>
-
-              <MatCardActionIcons>
-                <MatIconButton Icon="@MatIconNames.Favorite"></MatIconButton>
-              </MatCardActionIcons>
-            </MatCardActions>
-          </MatCard>
+          <WebAccess.Components.TwitterUserCard User="@context"/>
         </ItemTemplate>
       </MatVirtualScroll>
     </div>
@@ -78,13 +49,33 @@
     public DateTime Created { get; set; }
   }
 
-  public List<Temp> Items => new List<Temp> { };
+  public List<TwitterUser> Items { get; set; } = new List<TwitterUser>();
   private QueueItem _queueItem;
+  CancellationTokenSource disposalTokenSource = new CancellationTokenSource();
+  private ClientWebSocket webSocket = new ClientWebSocket();
 
-  public async Task OnClick(MouseEventArgs e)
+  public async Task OnNormalClick(MouseEventArgs e)
   {
     AddQueueRequest request = new AddQueueRequest();
-    request.TweetId = 1300840191771340801L;
+    request.TweetId = 1300041598449917953L;
+
+    var response = await Client.AddQueueItemAsync(request);
+    _queueItem = response.Item;
+  }
+
+  public async Task OnRetweetedClick(MouseEventArgs e)
+  {
+    AddQueueRequest request = new AddQueueRequest();
+    request.TweetId = 1303003523643330561L;
+
+    var response = await Client.AddQueueItemAsync(request);
+    _queueItem = response.Item;
+  }
+
+  public async Task OnQuotedClick(MouseEventArgs e)
+  {
+    AddQueueRequest request = new AddQueueRequest();
+    request.TweetId = 1302684242971893760L;
 
     var response = await Client.AddQueueItemAsync(request);
     _queueItem = response.Item;
@@ -92,16 +83,74 @@
 
   public async Task OnPlayClick(MouseEventArgs e)
   {
-    ReadItemsRequest readRequest = new ReadItemsRequest();
-    readRequest.QueueItems.Add(_queueItem);
-    var readResponse = await Client.ReadItemsAsync(readRequest);
+    ReadNextQueueItemsRequest request = new ReadNextQueueItemsRequest();
+    var readResponse = await Client.ReadNextQueueItemsAsync(request);
+  }
+
+  public async Task OnWebSocketConnect(MouseEventArgs e)
+  {
+    await webSocket.ConnectAsync(new Uri("ws://localhost:50080/connect"), disposalTokenSource.Token);
+    _ = HandleMessageReceivingAsync();
   }
 
   public async Task OnAddUserClick(MouseEventArgs e)
   {
     var request = new GetTwitterUserRequest();
     request.Handle = "realDonaldTrump";
+    request.VoiceName = "de-US-Wavenet-D";
+    request.Language = "de-US";
 
-    var response = await Client.GetTwitterUserAsync(request);
+    var response = await Client.AddTwitterUserAsync(request);
+  }
+
+  public async Task OnLoadUsersAsync()
+  {
+    var resp = await Client.GetAllTwitterUsersAsync(new GetAllTwitterUserRequest());
+    Items = resp.Users.ToList();
+    StateHasChanged();
+  }
+
+  public void Dispose()
+  {
+    _ = webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Bye", CancellationToken.None);
+
+    disposalTokenSource.Cancel();
+    disposalTokenSource.Dispose();
+
+    webSocket.Dispose();
+  }
+
+  async Task HandleMessageReceivingAsync()
+  {
+    var buffer = new ArraySegment<byte>(new byte[2048]);
+    while (!disposalTokenSource.IsCancellationRequested)
+    {
+      WebSocketReceiveResult received;
+      using MemoryStream data = new MemoryStream();
+
+      do
+      {
+        received = await webSocket.ReceiveAsync(buffer, disposalTokenSource.Token);
+        Console.WriteLine("Received {0} b ({1})", received.Count, received.EndOfMessage);
+        await data.WriteAsync(buffer.Slice(0, received.Count));
+      } while (!received.EndOfMessage);
+
+      try
+      {
+        data.Seek(0, SeekOrigin.Begin);
+        var item = QueueItem.Parser.ParseFrom(data);
+        Console.WriteLine("Parsed `QueueItem`: {0}", item != null);
+      }
+      catch (Exception e)
+      {
+        Console.WriteLine("Failed to Parse {0}", e.Message);
+      }
+
+      data.Seek(0, SeekOrigin.Begin);
+      var user = TwitterUser.Parser.ParseFrom(data);
+      Console.WriteLine("Parsed `TwitterUser`: {0}", user != null);
+
+      //Console.WriteLine("Received WebSocket Message: {0}", state);
+    }
   }
 }

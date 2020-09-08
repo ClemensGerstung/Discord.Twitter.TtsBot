@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
 using System;
 using System.Threading;
+using Discord.Twitter.TtsBot.AdminAccess;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -17,12 +18,14 @@ namespace Discord.Twitter.TtsBot
 
       using IHost host = CreateHostBuilder(args).Build();
       TtsBot bot = host.Services.GetService<TtsBot>();
-      
+      DatabaseContext database = host.Services.GetRequiredService<DatabaseContext>();
+
       await bot.StartAsync();
       await host.StartAsync();
 
       endSignal.WaitOne();
 
+      await database.SaveChangesAsync();
       await host.StopAsync();
       await bot.ShutdownAsync();
     }

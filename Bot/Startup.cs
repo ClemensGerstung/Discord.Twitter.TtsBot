@@ -9,6 +9,10 @@ using GrpcClient = Discord.Twitter.TtsBot.AdminAccess.AdminAccess.AdminAccessCli
 using Microsoft.Extensions.Configuration;
 using Grpc.Net.ClientFactory;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.AspNetCore.WebSockets;
+using SNWS = System.Net.WebSockets;
+using Microsoft.EntityFrameworkCore;
+using System.Threading.Tasks;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -25,8 +29,15 @@ namespace Discord.Twitter.TtsBot
     {
       services.AddGrpc();
       services.AddGrpcClient<GrpcClient>(OnAddGrpcClient);
-      services.AddSingleton(new DataStore());
-      services.AddSingleton(AddTtsBot);
+
+      services.AddWebSockets(options => { });
+
+      services.AddDbContext<DatabaseContext>();
+
+      services.AddSingleton(JsonConvert.DeserializeObject<Option>(File.ReadAllText("config.json")));
+      services.AddSingleton<DataStore>();
+      services.AddSingleton<TtsBot>();
+      
 
       services.AddCors(OnAddCors);
 
@@ -45,15 +56,6 @@ namespace Discord.Twitter.TtsBot
                                    "Grpc-Encoding", 
                                    "Grpc-Accept-Encoding");
       }
-
-      TtsBot AddTtsBot(IServiceProvider serviceProvider)
-      {
-        var grpcClient = serviceProvider.GetService<GrpcClient>();
-        var dataStore = serviceProvider.GetService<DataStore>();
-
-        Option option = JsonConvert.DeserializeObject<Option>(File.ReadAllText("config.json"));
-        return new TtsBot(option, grpcClient, dataStore);
-      }
     }
 
     public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
@@ -62,7 +64,40 @@ namespace Discord.Twitter.TtsBot
       app.UseGrpcWeb();
       app.UseCors();
 
+      var webSocketOptions = new WebSocketOptions()
+      {
+        KeepAliveInterval = TimeSpan.FromSeconds(120),
+        ReceiveBufferSize = 4 * 1024
+      };
+
+      app.UseWebSockets(webSocketOptions);
+
       app.UseEndpoints(OnUseEndPoints);
+
+      app.Use(async (context, next) =>
+      {
+        if (context.Request.Path == "/connect")
+        {
+          if (context.WebSockets.IsWebSocketRequest)
+          {
+            var ttsBot = context.RequestServices.GetService<TtsBot>();
+            SNWS.WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
+            var socketFinishedTcs = new TaskCompletionSource<object>();
+
+            ttsBot.AddWebSocket(webSocket, socketFinishedTcs);
+
+            await socketFinishedTcs.Task;
+          }
+          else
+          {
+            context.Response.StatusCode = 400;
+          }
+        }
+        else
+        {
+          await next();
+        }
+      });
 
       void OnUseEndPoints(IEndpointRouteBuilder endpoints)
       {

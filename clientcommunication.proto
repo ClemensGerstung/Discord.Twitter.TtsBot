@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+import "common.proto";
+
+package discord.twitter.ttsBot.adminAccess;
+
+message UserChangedNotification {
+  TwitterUser newUser = 2;
+  TwitterUser oldUser = 3;
+}
+
+message QueueChangedNotification {
+  QueueItem newItem = 1;
+  QueueItem oldItem = 2;
+}
+
+message ItemPlayedNotification {
+  QueueItem item = 1;
+}

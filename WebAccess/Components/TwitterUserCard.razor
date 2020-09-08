@@ -1,0 +1,29 @@
+﻿@using Tweetinvi
+
+<MatCard class="demo-mat-card">
+  <MatCardContent>
+    <MatCardMedia Wide="true" ImageUrl="@User.ProfileImageUrl">
+      <div class="demo-mat-card-content" style="color: white;">
+        <MatHeadline6 class="demo-mat-card-clean-margin">
+          @User.Name
+        </MatHeadline6>
+        <MatSubtitle2 class="demo-mat-card-clean-margin">
+          @@@User.Handle
+        </MatSubtitle2>
+      </div>
+    </MatCardMedia>
+
+  </MatCardContent>
+  <MatCardActions>
+    <MatCardActionButtons>
+      <MatButton>Remove</MatButton>
+    </MatCardActionButtons>
+  </MatCardActions>
+</MatCard>
+
+
+
+@code {
+  [Parameter]
+  public TwitterUser User { get; set; }
+}

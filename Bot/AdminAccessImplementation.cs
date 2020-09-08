@@ -1,4 +1,6 @@
 ﻿using Discord.Twitter.TtsBot.AdminAccess;
+using Google.Protobuf.WellKnownTypes;
+using Google.Type;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using System;
@@ -9,14 +11,16 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using System.Web;
 using Tweetinvi;
 using Tweetinvi.Models;
+using Tweetinvi.Models.Entities;
 
 namespace Discord.Twitter.TtsBot
 {
   using IUser = Tweetinvi.Models.IUser;
 
-  public class Impl : AdminAccess.AdminAccess.AdminAccessBase, 
+  public class Impl : AdminAccess.AdminAccess.AdminAccessBase,
                       IDisposable
   {
     private readonly Regex _urlRegex = new Regex(@"https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)");
@@ -45,7 +49,7 @@ namespace Discord.Twitter.TtsBot
 
     protected virtual void Dispose(bool disposing)
     {
-      
+
     }
 
     public override async Task<AddQueueResponse> AddQueueItem(AddQueueRequest request, ServerCallContext context)
@@ -63,30 +67,71 @@ namespace Discord.Twitter.TtsBot
           item = new QueueItem();
           item.TweetId = tweet.Id;
           item.Played = 0;
-          item.User = (await GetTwitterUser(new GetTwitterUserRequest { Id = tweet.CreatedBy.Id }, context)).User;
+          item.User = _dataStore.GetUser(tweet.CreatedBy.Id);
+          item.Created = tweet.CreatedAt
+                              .ToUniversalTime()
+                              .ToTimestamp();
 
-          string text = tweet.FullText;
+          StringBuilder builder = new StringBuilder("<speak>");
+          ISet <IUserMentionEntity> users = new HashSet<IUserMentionEntity>(tweet.UserMentions);
+          
           if (tweet.IsRetweet)
           {
             ITweet retweeted = tweet.RetweetedTweet;
-            text = retweeted.FullText;
+            builder.AppendFormat("I, {0} retweetet {1}:",
+                                 tweet.CreatedBy.Name,
+                                 tweet.CreatedBy.Id == retweeted.CreatedBy.Id ?
+                                   "myself" :
+                                   retweeted.CreatedBy.Name);
+            builder.Append("<break time=\"500ms\"/>");
+            builder.Append(retweeted.FullText);
+            
+            foreach (var userMention in retweeted.UserMentions)
+            {
+              users.Add(userMention);
+            }
           }
-
-          if (tweet.QuotedTweet != null)
+          else if (tweet.QuotedTweet != null)
           {
             ITweet quoted = tweet.QuotedTweet;
-            text = quoted.FullText;
+            builder.AppendFormat("I, {0} quoted {1}: ",
+                                 tweet.CreatedBy.Name,
+                                 tweet.CreatedBy.Id == quoted.CreatedBy.Id ?
+                                   "myself" :
+                                   quoted.CreatedBy.Name);
+            builder.Append("<break time=\"500ms\"/>");
+            builder.Append(quoted.FullText);
+            builder.Append("<break time=\"500ms\"/>");
+            builder.AppendFormat("My quote on that: {0}", tweet.FullText);
+
+            foreach (var userMention in quoted.UserMentions)
+            {
+              users.Add(userMention);
+            }
+          }
+          else
+          {
+            builder.AppendFormat("I, {0} tweeted: ",
+                                 tweet.CreatedBy.Name);
+            builder.Append(tweet.FullText);
           }
 
-          text = _urlRegex.Replace(text, "");
+          builder.Append("<break time=\"1s\"/>");
+          builder.Append("</speak>");
+
+          string text = _urlRegex.Replace(builder.ToString(), "");
           if (string.IsNullOrWhiteSpace(text))
           {
             response.IsEmpty = true;
             break;
           }
 
-          item.Content = text;
-
+          foreach (var user in users)
+          {
+            text = text.Replace($"@{user.ScreenName}", user.Name);
+          }
+          
+          item.Content = HttpUtility.HtmlDecode(text);
           response.Item = item;
           break;
       }
@@ -162,6 +207,7 @@ namespace Discord.Twitter.TtsBot
       response.User.Id = user.Id;
       response.User.Handle = user.ScreenName;
       response.User.Name = user.Name;
+      response.User.ProfileImageUrl = user.ProfileImageUrlFullSize;
 
       return response;
     }
@@ -170,11 +216,10 @@ namespace Discord.Twitter.TtsBot
     {
       ReadItemsResponse response = new ReadItemsResponse();
 
-      var audioClient = await _bot.BeginSoundAsync();
+      using var audioClient = await _bot.BeginSoundAsync();
       foreach (var item in request.QueueItems)
       {
         _dataStore.GetOrAdd(item);
-
         await _bot.PlayTweetAsync(audioClient, item.Content, item.User.VoiceName, item.User.Language);
 
         item.Played++;
@@ -182,7 +227,7 @@ namespace Discord.Twitter.TtsBot
 
         response.QueueItems.Add(item);
       }
-      await _bot.EndSoundAsync();
+      await _bot.EndSoundAsync(audioClient);
 
       return response;
     }

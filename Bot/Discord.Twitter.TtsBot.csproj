@@ -15,10 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CliWrap" Version="3.1.0" />
-    <PackageReference Include="Discord.Net" Version="2.2.0" />
-    <PackageReference Include="Discord.Net.Commands" Version="2.2.0" />
-    <PackageReference Include="Discord.Net.Providers.WS4Net" Version="2.2.0" />
+    <PackageReference Include="CliWrap" Version="3.1.1" />
     <PackageReference Include="Google.Cloud.TextToSpeech.V1" Version="2.0.0" />
     <PackageReference Include="Google.Protobuf" Version="3.13.0" />
     <PackageReference Include="Grpc" Version="2.31.0" />
@@ -28,14 +25,21 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="log4net" Version="2.0.8" />
+    <PackageReference Include="log4net" Version="2.0.9" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="3.1.8" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
     <PackageReference Include="TweetinviAPI" Version="4.0.3" />
   </ItemGroup>
 
   <ItemGroup>
     <Protobuf Include="..\admin-access.proto" GrpcServices="Both">
-      <Link>admin-access.proto</Link>
+      <Link>Proto\admin-access.proto</Link>
+    </Protobuf>
+    <Protobuf Include="..\clientcommunication.proto">
+      <Link>Proto\clientcommunication.proto</Link>
+    </Protobuf>
+    <Protobuf Include="..\common.proto">
+      <Link>Proto\common.proto</Link>
     </Protobuf>
   </ItemGroup>
 
@@ -50,5 +54,13 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="Proto\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Discord.Net\src\Discord.Net.WebSocket\Discord.Net.WebSocket.csproj" />
+  </ItemGroup>
 
 </Project>

@@ -19,6 +19,7 @@
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Build" Version="3.2.1" PrivateAssets="all" />
     <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="3.2.1" PrivateAssets="all" />
     <PackageReference Include="System.Net.Http.Json" Version="3.2.1" />
+    <PackageReference Include="TweetinviAPI" Version="4.0.3" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +29,12 @@
   <ItemGroup>
     <Protobuf Include="..\admin-access.proto" GrpcServices="Client">
       <Link>Proto\admin-access.proto</Link>
+    </Protobuf>
+    <Protobuf Include="..\clientcommunication.proto">
+      <Link>Proto\clientcommunication.proto</Link>
+    </Protobuf>
+    <Protobuf Include="..\common.proto">
+      <Link>Proto\common.proto</Link>
     </Protobuf>
   </ItemGroup>
 

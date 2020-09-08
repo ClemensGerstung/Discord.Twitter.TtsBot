@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+package discord.twitter.ttsBot.adminAccess;
+
+message QueueItem {
+  int64 tweetId = 1;
+  TwitterUser user = 2;
+  string content = 3;
+  google.protobuf.Timestamp created = 4;
+  int32 played = 5;
+}
+
+message TwitterUser {
+  int64 id = 1;
+  string handle = 2;
+  string name = 3;
+  string language = 4;
+  string voiceName = 5;
+  string profileImageUrl = 6;
+}

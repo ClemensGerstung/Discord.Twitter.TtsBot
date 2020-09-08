@@ -17,6 +17,10 @@ using log4net;
 using CliWrap;
 using System.IO;
 using Discord.Twitter.TtsBot.AdminAccess;
+using SNWS = System.Net.WebSockets;
+using System.Collections.Generic;
+using Google.Protobuf;
+using Tweetinvi.Logic.TwitterEntities;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -45,6 +49,7 @@ namespace Discord.Twitter.TtsBot
     private Regex _tweetIdRegex;
     private AdminAccess.AdminAccess.AdminAccessClient _grpcClient;
     private DataStore _store;
+    private IDictionary<SNWS.WebSocket, TaskCompletionSource<object>> _webSockets;
 
     private IFilteredStream _stream;
     private Task _twitterStreamTask;
@@ -55,6 +60,7 @@ namespace Discord.Twitter.TtsBot
       _grpcClient = grpcClient ?? throw new ArgumentNullException(nameof(grpcClient));
       _store = store ?? throw new ArgumentNullException(nameof(store));
       _tweetIdRegex = new Regex(@"\/(?<tweetId>\d+)");
+      _webSockets = new Dictionary<SNWS.WebSocket, TaskCompletionSource<object>>();
 
       if (option.GoogleUseEnvironmentVariable)
       {
@@ -72,6 +78,11 @@ namespace Discord.Twitter.TtsBot
       }
 
       _discord = new DiscordSocketClient();
+      _discord.Log += obj =>
+      {
+        Console.WriteLine(obj);
+        return Task.CompletedTask;
+      };
 
       _userCredentials = Auth.CreateCredentials(option.TwitterConsumerKey,
                                                 option.TwitterConsumerSecret,
@@ -88,10 +99,10 @@ namespace Discord.Twitter.TtsBot
     private void OnUserAddedToDataStore(object sender, UserAddedEventArgs args)
     {
       _stream.PauseStream();
-
       _stream.AddFollow(args.UserId);
-
       _stream.ResumeStream();
+      
+      _ = BroadcastAsync(_store.GetUser(args.UserId));
     }
 
     public async Task StartAsync()
@@ -127,9 +138,54 @@ namespace Discord.Twitter.TtsBot
       return _currentUser.VoiceChannel.ConnectAsync();
     }
 
-    internal Task EndSoundAsync()
+    internal Task EndSoundAsync(IAudioClient audioClient)
     {
-      return _currentUser.VoiceChannel.DisconnectAsync();
+      return audioClient.StopAsync();
+      //return _currentUser.VoiceChannel.DisconnectAsync();
+    }
+
+    internal void AddWebSocket(SNWS.WebSocket webSocket, TaskCompletionSource<object> tcs)
+    {
+      _webSockets.Add(webSocket, tcs);
+    }
+
+    private async Task BroadcastAsync(Google.Protobuf.IMessage message)
+    {
+      //QueueItem item = new QueueItem();
+      using MemoryStream stream = new MemoryStream();
+
+      message.WriteTo(stream);
+      stream.Seek(0, SeekOrigin.Begin);
+
+      ReadOnlyMemory<byte> readOnlyMemory = new ReadOnlyMemory<byte>();
+      await stream.WriteAsync(readOnlyMemory);
+
+      bool res = stream.TryGetBuffer(out ArraySegment<byte> array);
+
+      foreach (var kvp in _webSockets.ToArray())
+      {
+        var webSocket = kvp.Key;
+        if (webSocket.CloseStatus.HasValue)
+        {
+          await webSocket.CloseAsync(SNWS.WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
+          _webSockets.Remove(webSocket);
+          kvp.Value.SetResult(new object());
+          continue;
+        }
+
+        await webSocket.SendAsync(array, SNWS.WebSocketMessageType.Binary, true, CancellationToken.None);
+      }
+    }
+
+    public void PrintMessage(Google.Protobuf.IMessage message)
+    {
+
+      var descriptor = message.Descriptor;
+      if (descriptor.ClrType == typeof(QueueItem))
+      {
+        var item = (QueueItem)message;
+
+      }
     }
 
     private async Task OnDiscordMessageReceived(SocketMessage message)
@@ -177,44 +233,47 @@ namespace Discord.Twitter.TtsBot
       //  _playSoundSignal.Set();
       //}
 
-      //if (arguments.Length == 2 &&
-      //  arguments[0] == "read")
-      //{
-      //  string link = arguments[1];
-      //  Match match = _tweetIdRegex.Match(link);
-      //  if (long.TryParse(match.Groups["tweetId"].Value, out long id))
-      //  {
-      //    ITweet tweet = await TweetAsync.GetTweet(id);
-      //    if (tweet.CreatedBy.Id == _twitterUser.Id)
-      //    {
-      //      _queue.Enqueue(tweet);
-      //      _playSoundSignal.Set();
-      //    }
-      //  }
-      //}
+      if (arguments.Length == 2 &&
+        arguments[0] == "read")
+      {
+        string link = arguments[1];
+        Match match = _tweetIdRegex.Match(link);
+        if (long.TryParse(match.Groups["tweetId"].Value, out long id))
+        {
+          var request = new AddQueueRequest
+          {
+            TweetId = id
+          };
+          var response = _grpcClient.AddQueueItem(request);
+          var readResponse = _grpcClient.ReadNextQueueItems(new ReadNextQueueItemsRequest());
+        }
+      }
     }
 
     private void OnMatchingTweetReceived(object sender, MatchedTweetReceivedEventArgs args)
     {
-      if(_store.UserTracked(args.Tweet.CreatedBy.Id))
+      if (_store.UserTracked(args.Tweet.CreatedBy.Id))
       {
         var request = new AddQueueRequest
         {
           TweetId = args.Tweet.Id
         };
         var response = _grpcClient.AddQueueItem(request);
+
+        //_ = BroadcastAsync(1);
+
         var readResponse = _grpcClient.ReadNextQueueItems(new ReadNextQueueItemsRequest());
       }
     }
 
-    private async Task GetTweetAudioAsync(string text, string voiceName, string languageCode, Stream destination)
+    private async Task GetTweetAudioAsync(string ssml, string voiceName, string languageCode, Stream destination)
     {
       string args = "-hide_banner -loglevel panic -i pipe:0 -ac 2 -f s16le -ar 48000 pipe:1";
       var request = new SynthesizeSpeechRequest
       {
         Input = new SynthesisInput
         {
-          Text = text
+          Ssml = ssml
         },
         Voice = new VoiceSelectionParams
         {
