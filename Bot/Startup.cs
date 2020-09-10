@@ -63,7 +63,7 @@ namespace Discord.Twitter.TtsBot
       app.UseRouting();
       app.UseGrpcWeb();
       app.UseCors();
-
+    
       var webSocketOptions = new WebSocketOptions()
       {
         KeepAliveInterval = TimeSpan.FromSeconds(120),

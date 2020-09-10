@@ -1,9 +1,9 @@
-﻿@using Tweetinvi
+﻿@inject AdminAccess.AdminAccessClient Client
 
 <MatCard class="demo-mat-card">
   <MatCardContent>
     <MatCardMedia Wide="true" ImageUrl="@User.ProfileImageUrl">
-      <div class="demo-mat-card-content" style="color: white;">
+      <div class="demo-mat-card-content">
         <MatHeadline6 class="demo-mat-card-clean-margin">
           @User.Name
         </MatHeadline6>
@@ -16,7 +16,7 @@
   </MatCardContent>
   <MatCardActions>
     <MatCardActionButtons>
-      <MatButton>Remove</MatButton>
+      <MatButton OnClick="@OnRemoveClick">Remove</MatButton>
     </MatCardActionButtons>
   </MatCardActions>
 </MatCard>
@@ -26,4 +26,12 @@
 @code {
   [Parameter]
   public TwitterUser User { get; set; }
+
+  public async Task OnRemoveClick()
+  {
+    var request = new RemoveTwitterUserRequest();
+    request.TwitterUser = User;
+
+    var response = await Client.RemoveTwitterUserAsync(request);
+  }
 }

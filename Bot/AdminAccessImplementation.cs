@@ -152,6 +152,22 @@ namespace Discord.Twitter.TtsBot
       return response;
     }
 
+    public override Task<GetTwitterUserResponse> RemoveTwitterUser(RemoveTwitterUserRequest request, ServerCallContext context)
+    {
+      var user = request.TwitterUser;
+      if(request.UserCase == RemoveTwitterUserRequest.UserOneofCase.Id)
+      {
+        user = _dataStore.GetUser(request.Id);
+      }
+
+      if(_dataStore.RemoveUser(user))
+      {
+        return Task.FromResult(new GetTwitterUserResponse { User = user });
+      }
+
+      return Task.FromResult(new GetTwitterUserResponse());
+    }
+
     public override Task<GetAllTwitterUserRespone> GetAllTwitterUsers(GetAllTwitterUserRequest request, ServerCallContext context)
     {
       GetAllTwitterUserRespone response = new GetAllTwitterUserRespone();

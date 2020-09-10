@@ -18,14 +18,12 @@ namespace Discord.Twitter.TtsBot
 
       using IHost host = CreateHostBuilder(args).Build();
       TtsBot bot = host.Services.GetService<TtsBot>();
-      DatabaseContext database = host.Services.GetRequiredService<DatabaseContext>();
 
       await bot.StartAsync();
       await host.StartAsync();
 
       endSignal.WaitOne();
 
-      await database.SaveChangesAsync();
       await host.StopAsync();
       await bot.ShutdownAsync();
     }

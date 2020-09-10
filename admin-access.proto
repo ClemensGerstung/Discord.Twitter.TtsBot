@@ -8,6 +8,7 @@ package discord.twitter.ttsBot.adminAccess;
 service AdminAccess {
   rpc GetTwitterUser (GetTwitterUserRequest) returns (GetTwitterUserResponse);
   rpc AddTwitterUser (GetTwitterUserRequest) returns (GetTwitterUserResponse);
+  rpc RemoveTwitterUser (RemoveTwitterUserRequest) returns (GetTwitterUserResponse);
   rpc GetAllTwitterUsers (GetAllTwitterUserRequest) returns (GetAllTwitterUserRespone);
 
   rpc AddQueueItem (AddQueueRequest) returns (AddQueueResponse);
@@ -44,6 +45,13 @@ message GetTwitterUserRequest {
   }
   string language = 3;
   string voiceName = 4;
+}
+
+message RemoveTwitterUserRequest {
+  oneof user {
+    int64 id = 1;
+    TwitterUser twitterUser = 2;
+  }
 }
 
 message GetTwitterUserResponse {

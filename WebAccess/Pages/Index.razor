@@ -7,48 +7,47 @@
 @implements IDisposable
 @inject AdminAccess.AdminAccessClient Client
 
+<style>
+  .mat-virtual-scroll-item {
+    height: 150px;
+  }
+</style>
+
 <div class="mat-layout-grid">
   <div class="mat-layout-grid-inner">
-    <div class="mat-layout-grid-cell">
-      <div class="mat-layout-grid-inner">
-        <div class="mat-layout-grid-cell">
-          <MatButton OnClick="@OnNormalClick">Normal Tweet</MatButton>
-          <MatButton OnClick="@OnRetweetedClick">Retweetet Tweet</MatButton>
-          <MatButton OnClick="@OnQuotedClick">Quoted Tweet</MatButton>
+    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-4">
+      @*<MatButton OnClick="@OnNormalClick">Normal Tweet</MatButton>
+    <MatButton OnClick="@OnRetweetedClick">Retweetet Tweet</MatButton>
+    <MatButton OnClick="@OnQuotedClick">Quoted Tweet</MatButton>
 
-          <MatButton OnClick="@OnPlayClick">Play</MatButton>
+    <MatButton OnClick="@OnPlayClick">Play</MatButton>
 
-          <MatButton OnClick="@OnAddUserClick">Add User</MatButton>
-          <MatButton OnClick="@OnLoadUsersAsync">Load Users</MatButton>
+    <MatButton OnClick="@OnAddUserClick">Add User</MatButton>
 
-          <MatButton OnClick="@OnWebSocketConnect">UseWebSocket</MatButton>
-        </div>
-      </div>
+    <MatButton OnClick="@OnWebSocketConnect">UseWebSocket</MatButton>*@
+
+      <MatTextField @bind-Value="@NewUserHandle" Label="User Handle"></MatTextField>
+
+      <MatButton OnClick="@OnAddUserClick">Add User</MatButton>
+
+      <MatList>
+        @foreach (var user in Items)
+        {
+          <WebAccess.Components.TwitterUserCard User="@user" />
+        }
+      </MatList>
     </div>
-    <div class="mat-layout-grid-cell">
-      <MatVirtualScroll Items="@Items" ItemHeight="350" style="height: 100%">
-        <ItemTemplate>
-          <WebAccess.Components.TwitterUserCard User="@context"/>
-        </ItemTemplate>
-      </MatVirtualScroll>
     </div>
-    <div class="mat-layout-grid-cell">First level</div>
+    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
+      
+    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">First level</div>
   </div>
 </div>
 
 @code
 {
-  public class Temp
-  {
-    public string Text { get; set; }
 
-    public string DisplayName { get; set; }
-
-    public string UserName { get; set; }
-
-    public DateTime Created { get; set; }
-  }
-
+  public string NewUserHandle { get; set; }
   public List<TwitterUser> Items { get; set; } = new List<TwitterUser>();
   private QueueItem _queueItem;
   CancellationTokenSource disposalTokenSource = new CancellationTokenSource();
@@ -87,27 +86,28 @@
     var readResponse = await Client.ReadNextQueueItemsAsync(request);
   }
 
-  public async Task OnWebSocketConnect(MouseEventArgs e)
-  {
-    await webSocket.ConnectAsync(new Uri("ws://localhost:50080/connect"), disposalTokenSource.Token);
-    _ = HandleMessageReceivingAsync();
-  }
-
-  public async Task OnAddUserClick(MouseEventArgs e)
+  public async Task OnAddUserClick()
   {
     var request = new GetTwitterUserRequest();
-    request.Handle = "realDonaldTrump";
+    request.Handle = NewUserHandle;
     request.VoiceName = "de-US-Wavenet-D";
     request.Language = "de-US";
 
     var response = await Client.AddTwitterUserAsync(request);
+
+    NewUserHandle = null;
+    StateHasChanged();
   }
 
-  public async Task OnLoadUsersAsync()
+  protected override async Task OnInitializedAsync()
   {
     var resp = await Client.GetAllTwitterUsersAsync(new GetAllTwitterUserRequest());
     Items = resp.Users.ToList();
+
     StateHasChanged();
+
+    await webSocket.ConnectAsync(new Uri("ws://localhost:50080/connect"), disposalTokenSource.Token);
+    _ = HandleMessageReceivingAsync();
   }
 
   public void Dispose()
@@ -138,19 +138,27 @@
       try
       {
         data.Seek(0, SeekOrigin.Begin);
-        var item = QueueItem.Parser.ParseFrom(data);
-        Console.WriteLine("Parsed `QueueItem`: {0}", item != null);
+        var item = NotificationItem.Parser.ParseFrom(data);
+        Console.WriteLine("Parsed `NotificationItem`: {0}", item != null);
+
+        data.Seek(0, SeekOrigin.Begin);
+        if(item.Type == NotificationType.UserChanged)
+        {
+          var userNotification = UserChangedNotification.Parser.ParseFrom(data);
+
+          if (userNotification.NewUser != null)
+            Items.Add(userNotification.NewUser);
+
+          if (userNotification.OldUser != null)
+            Items.Remove(userNotification.OldUser);
+
+          StateHasChanged();
+        }
       }
       catch (Exception e)
       {
         Console.WriteLine("Failed to Parse {0}", e.Message);
       }
-
-      data.Seek(0, SeekOrigin.Begin);
-      var user = TwitterUser.Parser.ParseFrom(data);
-      Console.WriteLine("Parsed `TwitterUser`: {0}", user != null);
-
-      //Console.WriteLine("Received WebSocket Message: {0}", state);
     }
   }
 }

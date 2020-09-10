@@ -4,16 +4,29 @@ import "common.proto";
 
 package discord.twitter.ttsBot.adminAccess;
 
+enum NotificationType {
+  UserChanged = 0;
+  QueueChanged = 1;
+  ItemPlayed = 2;
+}
+
+message NotificationItem {
+  NotificationType type = 1;
+}
+
 message UserChangedNotification {
+  NotificationType type = 1;
   TwitterUser newUser = 2;
   TwitterUser oldUser = 3;
 }
 
 message QueueChangedNotification {
-  QueueItem newItem = 1;
-  QueueItem oldItem = 2;
+  NotificationType type = 1;
+  QueueItem newItem = 2;
+  QueueItem oldItem = 3;
 }
 
 message ItemPlayedNotification {
-  QueueItem item = 1;
+  NotificationType type = 1;
+  QueueItem item = 2;
 }

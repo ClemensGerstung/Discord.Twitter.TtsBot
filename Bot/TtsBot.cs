@@ -24,16 +24,16 @@ using Tweetinvi.Logic.TwitterEntities;
 
 namespace Discord.Twitter.TtsBot
 {
-  public class UserAddedEventArgs : EventArgs
+  public class UserChangedEventArgs : EventArgs
   {
-    public string ScreenName { get; }
+    public TwitterUser NewUser { get; }
 
-    public long UserId { get; }
+    public TwitterUser OldUser { get; }
 
-    public UserAddedEventArgs(long userId, string screenName)
+    internal UserChangedEventArgs(TwitterUser newUser, TwitterUser oldUser)
     {
-      ScreenName = screenName;
-      UserId = userId;
+      NewUser = newUser;
+      OldUser = oldUser;
     }
   }
 
@@ -93,16 +93,30 @@ namespace Discord.Twitter.TtsBot
       _stream = TwitterStream.CreateFilteredStream(_userCredentials, TweetMode.Extended);
       _stream.MatchingTweetReceived += OnMatchingTweetReceived;
 
-      _store.UserAdded += OnUserAddedToDataStore;
+      foreach (var user in _store.Users)
+        _stream.AddFollow(user.Id);
+
+      _store.UsersChanged += OnUserAddedToDataStore;
     }
 
-    private void OnUserAddedToDataStore(object sender, UserAddedEventArgs args)
+    private void OnUserAddedToDataStore(object sender, UserChangedEventArgs args)
     {
       _stream.PauseStream();
-      _stream.AddFollow(args.UserId);
+
+      if(args.NewUser != null)
+        _stream.AddFollow(args.NewUser.Id);
+
+      if (args.OldUser != null)
+        _stream.RemoveFollow(args.OldUser.Id);
+
       _stream.ResumeStream();
-      
-      _ = BroadcastAsync(_store.GetUser(args.UserId));
+
+      UserChangedNotification notification = new UserChangedNotification();
+      notification.Type = NotificationType.UserChanged;
+      notification.NewUser = args.NewUser;
+      notification.OldUser = args.OldUser;
+
+      _ = BroadcastAsync(notification);
     }
 
     public async Task StartAsync()
