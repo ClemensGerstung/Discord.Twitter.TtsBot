@@ -24,19 +24,6 @@ using Tweetinvi.Logic.TwitterEntities;
 
 namespace Discord.Twitter.TtsBot
 {
-  public class UserChangedEventArgs : EventArgs
-  {
-    public TwitterUser NewUser { get; }
-
-    public TwitterUser OldUser { get; }
-
-    internal UserChangedEventArgs(TwitterUser newUser, TwitterUser oldUser)
-    {
-      NewUser = newUser;
-      OldUser = oldUser;
-    }
-  }
-
   public class TtsBot
   {
     private ILog __log = LogManager.GetLogger(typeof(TtsBot));
@@ -97,6 +84,16 @@ namespace Discord.Twitter.TtsBot
         _stream.AddFollow(user.Id);
 
       _store.UsersChanged += OnUserAddedToDataStore;
+      _store.ItemQueued += OnItemQueued;
+    }
+
+    private async void OnItemQueued(object sender, ItemQueuedEventArgs e)
+    {
+      QueueChangedNotification notification = new QueueChangedNotification();
+      notification.NewItem = e.Item;
+      notification.Type = NotificationType.QueueChanged;
+
+      await BroadcastAsync(notification);
     }
 
     private void OnUserAddedToDataStore(object sender, UserChangedEventArgs args)
@@ -147,7 +144,7 @@ namespace Discord.Twitter.TtsBot
 
     internal Task<IAudioClient> BeginSoundAsync()
     {
-      if (_currentUser == null) return null;
+      if (_currentUser == null) return Task.FromResult((IAudioClient)null);
 
       return _currentUser.VoiceChannel.ConnectAsync();
     }
@@ -188,17 +185,6 @@ namespace Discord.Twitter.TtsBot
         }
 
         await webSocket.SendAsync(array, SNWS.WebSocketMessageType.Binary, true, CancellationToken.None);
-      }
-    }
-
-    public void PrintMessage(Google.Protobuf.IMessage message)
-    {
-
-      var descriptor = message.Descriptor;
-      if (descriptor.ClrType == typeof(QueueItem))
-      {
-        var item = (QueueItem)message;
-
       }
     }
 
@@ -254,12 +240,7 @@ namespace Discord.Twitter.TtsBot
         Match match = _tweetIdRegex.Match(link);
         if (long.TryParse(match.Groups["tweetId"].Value, out long id))
         {
-          var request = new AddQueueRequest
-          {
-            TweetId = id
-          };
-          var response = _grpcClient.AddQueueItem(request);
-          var readResponse = _grpcClient.ReadNextQueueItems(new ReadNextQueueItemsRequest());
+          await AddAndReadTweet(id);
         }
       }
     }
@@ -268,16 +249,20 @@ namespace Discord.Twitter.TtsBot
     {
       if (_store.UserTracked(args.Tweet.CreatedBy.Id))
       {
-        var request = new AddQueueRequest
-        {
-          TweetId = args.Tweet.Id
-        };
-        var response = _grpcClient.AddQueueItem(request);
-
-        //_ = BroadcastAsync(1);
-
-        var readResponse = _grpcClient.ReadNextQueueItems(new ReadNextQueueItemsRequest());
+        _ = AddAndReadTweet(args.Tweet.Id);
       }
+    }
+
+    private async Task AddAndReadTweet(long tweetId)
+    {
+      var request = new AddQueueRequest
+      {
+        TweetId = tweetId
+      };
+      var response = await _grpcClient.AddQueueItemAsync(request);
+      if (response.IsEmpty) return;
+
+      var readResponse = await _grpcClient.ReadNextQueueItemsAsync(new ReadNextQueueItemsRequest());
     }
 
     private async Task GetTweetAudioAsync(string ssml, string voiceName, string languageCode, Stream destination)

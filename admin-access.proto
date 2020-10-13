@@ -13,6 +13,7 @@ service AdminAccess {
 
   rpc AddQueueItem (AddQueueRequest) returns (AddQueueResponse);
   rpc GetQueue (GetQueueRequest) returns (GetQueueResponse);
+  rpc GetItems(GetQueueRequest) returns (GetQueueResponse);
   rpc GetReadItems (GetQueueRequest) returns (GetQueueResponse);
   rpc ReadItems (ReadItemsRequest) returns (ReadItemsResponse);
   rpc ReadNextQueueItems (ReadNextQueueItemsRequest) returns (ReadItemsResponse);

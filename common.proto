@@ -10,6 +10,7 @@ message QueueItem {
   string content = 3;
   google.protobuf.Timestamp created = 4;
   int32 played = 5;
+  string ssml = 6;
 }
 
 message TwitterUser {

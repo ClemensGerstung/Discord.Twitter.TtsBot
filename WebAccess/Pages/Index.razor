@@ -3,7 +3,7 @@
 @using System.Text
 @using System.Threading
 @using Google.Protobuf
-@using System.IO 
+@using System.IO
 @implements IDisposable
 @inject AdminAccess.AdminAccessClient Client
 
@@ -17,30 +17,59 @@
   <div class="mat-layout-grid-inner">
     <div class="mat-layout-grid-cell mat-layout-grid-cell-span-4">
       @*<MatButton OnClick="@OnNormalClick">Normal Tweet</MatButton>
-    <MatButton OnClick="@OnRetweetedClick">Retweetet Tweet</MatButton>
-    <MatButton OnClick="@OnQuotedClick">Quoted Tweet</MatButton>
+      <MatButton OnClick="@OnRetweetedClick">Retweetet Tweet</MatButton>
+      <MatButton OnClick="@OnQuotedClick">Quoted Tweet</MatButton>
 
-    <MatButton OnClick="@OnPlayClick">Play</MatButton>
+      <MatButton OnClick="@OnPlayClick">Play</MatButton>
 
-    <MatButton OnClick="@OnAddUserClick">Add User</MatButton>
+      <MatButton OnClick="@OnAddUserClick">Add User</MatButton>
 
-    <MatButton OnClick="@OnWebSocketConnect">UseWebSocket</MatButton>*@
+      <MatButton OnClick="@OnWebSocketConnect">UseWebSocket</MatButton>*@
+      <MatHeadline3>Users</MatHeadline3>
 
       <MatTextField @bind-Value="@NewUserHandle" Label="User Handle"></MatTextField>
 
       <MatButton OnClick="@OnAddUserClick">Add User</MatButton>
 
       <MatList>
-        @foreach (var user in Items)
+        @foreach (var user in Users)
         {
           <WebAccess.Components.TwitterUserCard User="@user" />
         }
       </MatList>
     </div>
+    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-4">
+      <MatHeadline3>Queue</MatHeadline3>
+
+      <MatButton Icon="playlist_play" Unelevated="true">Play All</MatButton>
+      <MatButton Icon="play_arrow" Outlined="true">Play Next</MatButton>
+
+      <MatButton OnClick="@OnNormalClick">Normal Tweet</MatButton>
+      <MatButton OnClick="@OnRetweetedClick">Retweetet Tweet</MatButton>
+      <MatButton OnClick="@OnQuotedClick">Quoted Tweet</MatButton>
+
+      <MatList>
+        @foreach (var item in QueueItems)
+        {
+          <WebAccess.Components.TweetCard Item="@item" ShowAddToQueue="false" />
+        }
+      </MatList>
     </div>
-    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">
-      
-    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-3">First level</div>
+
+    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-4">
+      <MatHeadline3>Items</MatHeadline3>
+
+      <MatButton OnClick="@OnNormalClick">Normal Tweet</MatButton>
+      <MatButton OnClick="@OnRetweetedClick">Retweetet Tweet</MatButton>
+      <MatButton OnClick="@OnQuotedClick">Quoted Tweet</MatButton>
+
+      <MatList>
+        @foreach (var item in Items)
+        {
+          <WebAccess.Components.TweetCard Item="@item" />
+        }
+      </MatList>
+    </div>
   </div>
 </div>
 
@@ -48,42 +77,35 @@
 {
 
   public string NewUserHandle { get; set; }
-  public List<TwitterUser> Items { get; set; } = new List<TwitterUser>();
-  private QueueItem _queueItem;
+  public List<TwitterUser> Users { get; set; } = new List<TwitterUser>();
+  public List<QueueItem> Items { get; set; } = new List<QueueItem>();
+  public List<QueueItem> QueueItems { get; set; } = new List<QueueItem>();
+
   CancellationTokenSource disposalTokenSource = new CancellationTokenSource();
   private ClientWebSocket webSocket = new ClientWebSocket();
 
-  public async Task OnNormalClick(MouseEventArgs e)
+  public async Task OnNormalClick()
   {
     AddQueueRequest request = new AddQueueRequest();
     request.TweetId = 1300041598449917953L;
 
     var response = await Client.AddQueueItemAsync(request);
-    _queueItem = response.Item;
   }
 
-  public async Task OnRetweetedClick(MouseEventArgs e)
+  public async Task OnRetweetedClick()
   {
     AddQueueRequest request = new AddQueueRequest();
     request.TweetId = 1303003523643330561L;
 
     var response = await Client.AddQueueItemAsync(request);
-    _queueItem = response.Item;
   }
 
-  public async Task OnQuotedClick(MouseEventArgs e)
+  public async Task OnQuotedClick()
   {
     AddQueueRequest request = new AddQueueRequest();
     request.TweetId = 1302684242971893760L;
 
     var response = await Client.AddQueueItemAsync(request);
-    _queueItem = response.Item;
-  }
-
-  public async Task OnPlayClick(MouseEventArgs e)
-  {
-    ReadNextQueueItemsRequest request = new ReadNextQueueItemsRequest();
-    var readResponse = await Client.ReadNextQueueItemsAsync(request);
   }
 
   public async Task OnAddUserClick()
@@ -102,7 +124,10 @@
   protected override async Task OnInitializedAsync()
   {
     var resp = await Client.GetAllTwitterUsersAsync(new GetAllTwitterUserRequest());
-    Items = resp.Users.ToList();
+    Users = resp.Users.ToList();
+
+    var itemsResp = await Client.GetItemsAsync(new GetQueueRequest());
+    Items = itemsResp.Items.ToList();
 
     StateHasChanged();
 
@@ -142,15 +167,24 @@
         Console.WriteLine("Parsed `NotificationItem`: {0}", item != null);
 
         data.Seek(0, SeekOrigin.Begin);
-        if(item.Type == NotificationType.UserChanged)
+        if (item.Type == NotificationType.UserChanged)
         {
           var userNotification = UserChangedNotification.Parser.ParseFrom(data);
 
           if (userNotification.NewUser != null)
-            Items.Add(userNotification.NewUser);
+            Users.Add(userNotification.NewUser);
 
           if (userNotification.OldUser != null)
-            Items.Remove(userNotification.OldUser);
+            Users.Remove(userNotification.OldUser);
+
+          StateHasChanged();
+        }
+        else if(item.Type == NotificationType.QueueChanged)
+        {
+          var notification = QueueChangedNotification.Parser.ParseFrom(data);
+
+          if (notification.NewItem != null)
+            Items.Add(notification.NewItem);
 
           StateHasChanged();
         }

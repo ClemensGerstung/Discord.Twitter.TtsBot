@@ -1,0 +1,41 @@
+﻿@inject AdminAccess.AdminAccessClient Client
+
+<MatCard class="demo-mat-card">
+  <MatCardContent>
+    <div style="padding: 1rem; padding-bottom: 0.5rem">
+      <MatHeadline6 class="demo-mat-card-clean-margin">
+        @Item.User.Name
+      </MatHeadline6>
+      <MatSubtitle1>@@@Item.User.Handle</MatSubtitle1>
+      <MatSubtitle2 class="demo-mat-card-clean-margin">
+        @Item.Created.ToDateTime().ToString("g")
+      </MatSubtitle2>
+    </div>
+
+    <MatBody2 class="demo-mat-card-clean-margin" style="padding: 1rem; padding-top: 0.5rem">
+      @Item.Content
+    </MatBody2>
+  </MatCardContent>
+  @if (ShowAddToQueue)
+  {
+    <MatCardActions>
+      <MatCardActionButtons>
+        <MatButton OnClick="@OnAddToQueueClick">Add To Queue</MatButton>
+      </MatCardActionButtons>
+    </MatCardActions>
+  }
+</MatCard>
+
+
+
+@code {
+  [Parameter]
+  public QueueItem Item { get; set; }
+
+  [Parameter]
+  public bool ShowAddToQueue { get; set; } = true;
+
+  public async Task OnAddToQueueClick()
+  {
+  }
+}

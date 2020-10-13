@@ -5,49 +5,11 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Discord.Twitter.TtsBot.AdminAccess;
-using Google.Protobuf.WellKnownTypes;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Tweetinvi.Core.Extensions;
 
 namespace Discord.Twitter.TtsBot
 {
-  public class DatabaseContext : DbContext
-  {
-    public DbSet<TwitterUser> Users { get; set; }
-    public DbSet<QueueItem> Items { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-      base.OnConfiguring(optionsBuilder);
-
-      optionsBuilder.UseSqlite("Data Source=datastorage.db",
-        options =>
-        {
-          //options.MigrationsAssembly(Assembly.GetExecutingAssembly().FullName);
-        });
-      optionsBuilder.EnableSensitiveDataLogging();
-    }
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
-    {
-      base.OnModelCreating(modelBuilder);
-
-      modelBuilder.Entity<TwitterUser>()
-                  .ToTable("Users")
-                  .HasKey(user => user.Id);
-      modelBuilder.Entity<QueueItem>()
-                  .ToTable("Items")
-                  .HasKey(qi => qi.TweetId);
-
-      modelBuilder.Entity<QueueItem>()
-                  .Property(qi => qi.Created)
-                  .HasConversion(ts => ts.ToDateTime().ToString("s"),
-                                 v => Timestamp.FromDateTime(DateTime.Parse(v)));
-    }
-
-  }
-
   public class DataStore
   {
     private readonly ConcurrentDictionary<long, TwitterUser> _users = new ConcurrentDictionary<long, TwitterUser>();
@@ -63,6 +25,7 @@ namespace Discord.Twitter.TtsBot
     public ICollection<QueueItem> Items => _items.Values;
 
     public event EventHandler<UserChangedEventArgs> UsersChanged;
+    public event EventHandler<ItemQueuedEventArgs> ItemQueued;
 
     public DataStore(DatabaseContext context)
     {
@@ -71,11 +34,15 @@ namespace Discord.Twitter.TtsBot
 
       _context.Users
               .ForEach(user => _users.TryAdd(user.Id, user));
+
+      _context.Items.ForEach(item => _items.TryAdd(item.TweetId, item));
     }
 
     public void Enqueue(QueueItem item)
     {
-      _queue.Enqueue(GetOrAdd(item).TweetId);
+      QueueItem queueItem = GetOrAdd(item);
+      _queue.Enqueue(queueItem.TweetId);
+      ItemQueued?.Invoke(this, new ItemQueuedEventArgs(queueItem));
     }
 
     public void AddUser(TwitterUser user)

@@ -13,6 +13,11 @@ using Microsoft.AspNetCore.WebSockets;
 using SNWS = System.Net.WebSockets;
 using Microsoft.EntityFrameworkCore;
 using System.Threading.Tasks;
+using System.Net.Http;
+using Grpc.Net.Client;
+using Grpc.Core;
+using Discord.Twitter.TtsBot.AdminAccess;
+using Grpc.Net.Client.Web;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -28,12 +33,18 @@ namespace Discord.Twitter.TtsBot
     public void ConfigureServices(IServiceCollection services)
     {
       services.AddGrpc();
-      services.AddGrpcClient<GrpcClient>(OnAddGrpcClient);
+      //services.AddGrpcClient<GrpcClient>(OnAddGrpcClient);
 
       services.AddWebSockets(options => { });
 
       services.AddDbContext<DatabaseContext>();
 
+      services.AddSingleton(_ =>
+      {
+        var httpHandler = new GrpcWebHandler(GrpcWebMode.GrpcWebText, new HttpClientHandler());
+        var channel = GrpcChannel.ForAddress("http://localhost:50080/", new GrpcChannelOptions { HttpHandler = httpHandler });
+        return new GrpcClient(channel);
+      });
       services.AddSingleton(JsonConvert.DeserializeObject<Option>(File.ReadAllText("config.json")));
       services.AddSingleton<DataStore>();
       services.AddSingleton<TtsBot>();
@@ -41,7 +52,10 @@ namespace Discord.Twitter.TtsBot
 
       services.AddCors(OnAddCors);
 
-      void OnAddGrpcClient(GrpcClientFactoryOptions options) => options.Address = new Uri("http://localhost:50080/");
+      void OnAddGrpcClient(GrpcClientFactoryOptions options) 
+      {
+        options.Address = new Uri("http://localhost:50080/");
+      }
 
       void OnAddCors(CorsOptions options) => options.AddPolicy("AllowAll", 
                                                                OnAddPolicy);

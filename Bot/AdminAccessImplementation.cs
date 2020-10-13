@@ -131,7 +131,8 @@ namespace Discord.Twitter.TtsBot
             text = text.Replace($"@{user.ScreenName}", user.Name);
           }
           
-          item.Content = HttpUtility.HtmlDecode(text);
+          item.Ssml = HttpUtility.HtmlDecode(text);
+          item.Content = HttpUtility.HtmlDecode(tweet.FullText);
           response.Item = item;
           break;
       }
@@ -191,6 +192,27 @@ namespace Discord.Twitter.TtsBot
       return Task.FromResult(response);
     }
 
+    public override Task<GetQueueResponse> GetItems(GetQueueRequest request, ServerCallContext context)
+    {
+      GetQueueResponse response = new GetQueueResponse();
+      var items = _dataStore.Items;
+      var from = request.From ?? items.Min(i => i.Created);
+      var to = request.To ?? items.Max(i => i.Created);
+      var users = request.Users.ToList();
+
+      if (users.Count == 0)
+      {
+        users = _dataStore.Users.ToList();
+      }
+
+      response.Items
+              .Add(items.Where(q => users.Contains(q.User))
+                        .Where(q => q.Content.Contains(request.Filter))
+                        .Where(q => q.Created >= from && q.Created < to));
+
+      return Task.FromResult(response);
+    }
+
     public override Task<GetQueueResponse> GetReadItems(GetQueueRequest request, ServerCallContext context)
     {
       GetQueueResponse response = new GetQueueResponse();
@@ -232,14 +254,21 @@ namespace Discord.Twitter.TtsBot
     {
       ReadItemsResponse response = new ReadItemsResponse();
 
-      using var audioClient = await _bot.BeginSoundAsync();
+      var audioClient = await _bot.BeginSoundAsync();
+      if(audioClient == null)
+      {
+        return response;
+      }
+
       foreach (var item in request.QueueItems)
       {
         _dataStore.GetOrAdd(item);
-        await _bot.PlayTweetAsync(audioClient, item.Content, item.User.VoiceName, item.User.Language);
+        await _bot.PlayTweetAsync(audioClient, item.Ssml, item.User.VoiceName, item.User.Language);
 
         item.Played++;
         _dataStore.IncreasePlayCount(item);
+
+        _logger.LogInformation("Played \"{0}\" for the {1} time", item.Content, item.Played);
 
         response.QueueItems.Add(item);
       }
