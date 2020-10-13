@@ -36,7 +36,7 @@ namespace Discord.Twitter.TtsBot
     private Regex _tweetIdRegex;
     private AdminAccess.AdminAccess.AdminAccessClient _grpcClient;
     private DataStore _store;
-    private IDictionary<SNWS.WebSocket, TaskCompletionSource<object>> _webSockets;
+    
 
     private IFilteredStream _stream;
     private Task _twitterStreamTask;
@@ -47,8 +47,7 @@ namespace Discord.Twitter.TtsBot
       _grpcClient = grpcClient ?? throw new ArgumentNullException(nameof(grpcClient));
       _store = store ?? throw new ArgumentNullException(nameof(store));
       _tweetIdRegex = new Regex(@"\/(?<tweetId>\d+)");
-      _webSockets = new Dictionary<SNWS.WebSocket, TaskCompletionSource<object>>();
-
+      
       if (option.GoogleUseEnvironmentVariable)
       {
         _ttsClient = TextToSpeechClient.Create();
@@ -84,16 +83,6 @@ namespace Discord.Twitter.TtsBot
         _stream.AddFollow(user.Id);
 
       _store.UsersChanged += OnUserAddedToDataStore;
-      _store.ItemQueued += OnItemQueued;
-    }
-
-    private async void OnItemQueued(object sender, ItemQueuedEventArgs e)
-    {
-      QueueChangedNotification notification = new QueueChangedNotification();
-      notification.NewItem = e.Item;
-      notification.Type = NotificationType.QueueChanged;
-
-      await BroadcastAsync(notification);
     }
 
     private void OnUserAddedToDataStore(object sender, UserChangedEventArgs args)
@@ -107,13 +96,6 @@ namespace Discord.Twitter.TtsBot
         _stream.RemoveFollow(args.OldUser.Id);
 
       _stream.ResumeStream();
-
-      UserChangedNotification notification = new UserChangedNotification();
-      notification.Type = NotificationType.UserChanged;
-      notification.NewUser = args.NewUser;
-      notification.OldUser = args.OldUser;
-
-      _ = BroadcastAsync(notification);
     }
 
     public async Task StartAsync()
@@ -153,39 +135,6 @@ namespace Discord.Twitter.TtsBot
     {
       return audioClient.StopAsync();
       //return _currentUser.VoiceChannel.DisconnectAsync();
-    }
-
-    internal void AddWebSocket(SNWS.WebSocket webSocket, TaskCompletionSource<object> tcs)
-    {
-      _webSockets.Add(webSocket, tcs);
-    }
-
-    private async Task BroadcastAsync(Google.Protobuf.IMessage message)
-    {
-      //QueueItem item = new QueueItem();
-      using MemoryStream stream = new MemoryStream();
-
-      message.WriteTo(stream);
-      stream.Seek(0, SeekOrigin.Begin);
-
-      ReadOnlyMemory<byte> readOnlyMemory = new ReadOnlyMemory<byte>();
-      await stream.WriteAsync(readOnlyMemory);
-
-      bool res = stream.TryGetBuffer(out ArraySegment<byte> array);
-
-      foreach (var kvp in _webSockets.ToArray())
-      {
-        var webSocket = kvp.Key;
-        if (webSocket.CloseStatus.HasValue)
-        {
-          await webSocket.CloseAsync(SNWS.WebSocketCloseStatus.NormalClosure, "", CancellationToken.None);
-          _webSockets.Remove(webSocket);
-          kvp.Value.SetResult(new object());
-          continue;
-        }
-
-        await webSocket.SendAsync(array, SNWS.WebSocketMessageType.Binary, true, CancellationToken.None);
-      }
     }
 
     private async Task OnDiscordMessageReceived(SocketMessage message)

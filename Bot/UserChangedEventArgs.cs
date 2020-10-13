@@ -16,11 +16,24 @@ namespace Discord.Twitter.TtsBot
     }
   }
 
-  public class ItemQueuedEventArgs : EventArgs
+  public class ItemsChangedEventArgs : EventArgs
+  {
+    public QueueItem NewItem { get; }
+
+    public QueueItem OldItem { get; }
+
+    public ItemsChangedEventArgs(QueueItem newItem, QueueItem oldItem)
+    {
+      NewItem = newItem;
+      OldItem = oldItem;
+    }
+  }
+
+  public class ItemPlayedEventArgs : EventArgs
   {
     public QueueItem Item { get; }
 
-    public ItemQueuedEventArgs(QueueItem item)
+    public ItemPlayedEventArgs(QueueItem item)
     {
       Item = item;
     }

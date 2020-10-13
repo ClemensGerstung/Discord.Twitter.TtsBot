@@ -7,7 +7,8 @@ package discord.twitter.ttsBot.adminAccess;
 enum NotificationType {
   UserChanged = 0;
   QueueChanged = 1;
-  ItemPlayed = 2;
+  ItemsChanged = 2;
+  ItemPlayed = 3;
 }
 
 message NotificationItem {

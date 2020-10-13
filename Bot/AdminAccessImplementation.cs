@@ -181,13 +181,9 @@ namespace Discord.Twitter.TtsBot
     {
       GetQueueResponse response = new GetQueueResponse();
       var items = _dataStore.QueueItems;
-      var from = request.From ?? items.Min(i => i.Created);
-      var to = request.To ?? items.Max(i => i.Created);
-
+      
       response.Items
-              .Add(items.Where(q => request.Users.Contains(q.User))
-                        .Where(q => q.Content.Contains(request.Filter))
-                        .Where(q => q.Created >= from && q.Created < to));
+              .Add(FilterQueueItems(items, request));
 
       return Task.FromResult(response);
     }
@@ -196,19 +192,9 @@ namespace Discord.Twitter.TtsBot
     {
       GetQueueResponse response = new GetQueueResponse();
       var items = _dataStore.Items;
-      var from = request.From ?? items.Min(i => i.Created);
-      var to = request.To ?? items.Max(i => i.Created);
-      var users = request.Users.ToList();
-
-      if (users.Count == 0)
-      {
-        users = _dataStore.Users.ToList();
-      }
-
+      
       response.Items
-              .Add(items.Where(q => users.Contains(q.User))
-                        .Where(q => q.Content.Contains(request.Filter))
-                        .Where(q => q.Created >= from && q.Created < to));
+              .Add(FilterQueueItems(items, request));
 
       return Task.FromResult(response);
     }
@@ -218,14 +204,9 @@ namespace Discord.Twitter.TtsBot
       GetQueueResponse response = new GetQueueResponse();
 
       var items = _dataStore.Items;
-      var from = request.From ?? items.Min(i => i.Created);
-      var to = request.To ?? items.Max(i => i.Created);
-
+      
       response.Items
-              .Add(items.Where(q => q.Played > 0)
-                        .Where(q => request.Users.Contains(q.User))
-                        .Where(q => q.Content.Contains(request.Filter))
-                        .Where(q => q.Created >= from && q.Created < to));
+              .Add(FilterQueueItems(items.Where(q => q.Played > 0), request));
 
       return Task.FromResult(response);
     }
@@ -253,16 +234,74 @@ namespace Discord.Twitter.TtsBot
     public override async Task<ReadItemsResponse> ReadItems(ReadItemsRequest request, ServerCallContext context)
     {
       ReadItemsResponse response = new ReadItemsResponse();
+      var enumerator = request.QueueItems.GetEnumerator();
 
-      var audioClient = await _bot.BeginSoundAsync();
-      if(audioClient == null)
+      var items = await PlayQueueItemsAsync(AquireItem);
+      response.QueueItems.Add(items);
+
+      return response;
+
+      Task<QueueItem> AquireItem()
       {
-        return response;
+        if (enumerator.MoveNext())
+        {
+          return Task.FromResult(enumerator.Current);
+        }
+
+        return Task.FromResult((QueueItem)null);
+      }
+    }
+
+    public override async Task<ReadItemsResponse> ReadNextQueueItems(ReadNextQueueItemsRequest request, ServerCallContext context)
+    {
+      ReadItemsResponse response = new ReadItemsResponse();
+
+      var enumerator = _dataStore.GetQueueEnumerator(request.Count);
+
+      var items = await PlayQueueItemsAsync(AquireItem);
+      response.QueueItems.Add(items);
+
+      return response;
+
+      Task<QueueItem> AquireItem()
+      {
+        if (enumerator.MoveNext())
+        {
+          return Task.FromResult(enumerator.Current);
+        }
+
+        return Task.FromResult((QueueItem)null);
+      }
+    }
+
+    private IEnumerable<QueueItem> FilterQueueItems(IEnumerable<QueueItem> items, GetQueueRequest request)
+    {
+      var from = request.From ?? items.Min(i => i.Created);
+      var to = request.To ?? items.Max(i => i.Created);
+      var users = request.Users.ToList();
+
+      if (users.Count == 0)
+      {
+        users = _dataStore.Users.ToList();
       }
 
-      foreach (var item in request.QueueItems)
+      return items.Where(q => users.Contains(q.User))
+                  .Where(q => q.Content.Contains(request.Filter))
+                  .Where(q => q.Created >= from && q.Created < to);
+    }
+
+    private async Task<IEnumerable<QueueItem>> PlayQueueItemsAsync(Func<Task<QueueItem>> aquireItem)
+    {
+      var result = new List<QueueItem>();
+      var audioClient = await _bot.BeginSoundAsync();
+      if (audioClient == null)
       {
-        _dataStore.GetOrAdd(item);
+        return result;
+      }
+
+      QueueItem item;
+      while((item = await aquireItem()) != null)
+      {
         await _bot.PlayTweetAsync(audioClient, item.Ssml, item.User.VoiceName, item.User.Language);
 
         item.Played++;
@@ -270,20 +309,12 @@ namespace Discord.Twitter.TtsBot
 
         _logger.LogInformation("Played \"{0}\" for the {1} time", item.Content, item.Played);
 
-        response.QueueItems.Add(item);
+        result.Add(item);
       }
+
       await _bot.EndSoundAsync(audioClient);
 
-      return response;
-    }
-
-    public override Task<ReadItemsResponse> ReadNextQueueItems(ReadNextQueueItemsRequest request, ServerCallContext context)
-    {
-      ReadItemsRequest readRequest = new ReadItemsRequest();
-
-      readRequest.QueueItems.AddRange(_dataStore.GetNextQueueItems(request.Count));
-
-      return ReadItems(readRequest, context);
+      return result;
     }
   }
 }

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System;
 using System.Threading;
 using Discord.Twitter.TtsBot.AdminAccess;
+using Microsoft.Extensions.Logging;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -31,6 +32,11 @@ namespace Discord.Twitter.TtsBot
     public static IHostBuilder CreateHostBuilder(string[] args)
     {
       IHostBuilder builder = Host.CreateDefaultBuilder(args)
+                                 .ConfigureLogging(logging =>
+                                 {
+                                   logging.ClearProviders();
+                                   logging.AddConsole();
+                                 })
                                  .ConfigureWebHostDefaults(webBuilder =>
                                  {
                                    webBuilder.UseStartup<Startup>();

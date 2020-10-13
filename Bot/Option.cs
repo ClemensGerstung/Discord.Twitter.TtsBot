@@ -1,7 +1,4 @@
 ﻿using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace Discord.Twitter.TtsBot
 {
@@ -28,15 +25,6 @@ namespace Discord.Twitter.TtsBot
 
     [JsonProperty("auth.discord.token")]
     public string DiscordToken { get; set; }
-
-    [JsonProperty("data.follow")]
-    public string FollowTwitterUser { get; set; }
-
-    [JsonProperty("data.voiceName")]
-    public string VoiceName { get; set; }
-
-    [JsonProperty("data.language")]
-    public string LangaugeCode { get; set; }
 
     [JsonProperty("data.commandPrefix")]
     public string CommandPrefix { get; set; }

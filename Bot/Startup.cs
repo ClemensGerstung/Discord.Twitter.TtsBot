@@ -7,16 +7,10 @@ using System.IO;
 using Microsoft.AspNetCore.Cors.Infrastructure;
 using GrpcClient = Discord.Twitter.TtsBot.AdminAccess.AdminAccess.AdminAccessClient;
 using Microsoft.Extensions.Configuration;
-using Grpc.Net.ClientFactory;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.WebSockets;
-using SNWS = System.Net.WebSockets;
-using Microsoft.EntityFrameworkCore;
-using System.Threading.Tasks;
 using System.Net.Http;
 using Grpc.Net.Client;
-using Grpc.Core;
-using Discord.Twitter.TtsBot.AdminAccess;
 using Grpc.Net.Client.Web;
 
 namespace Discord.Twitter.TtsBot
@@ -48,14 +42,15 @@ namespace Discord.Twitter.TtsBot
       services.AddSingleton(JsonConvert.DeserializeObject<Option>(File.ReadAllText("config.json")));
       services.AddSingleton<DataStore>();
       services.AddSingleton<TtsBot>();
+      services.AddSingleton<WebSocketHandler>();
       
 
       services.AddCors(OnAddCors);
 
-      void OnAddGrpcClient(GrpcClientFactoryOptions options) 
-      {
-        options.Address = new Uri("http://localhost:50080/");
-      }
+      //void OnAddGrpcClient(GrpcClientFactoryOptions options) 
+      //{
+      //  options.Address = new Uri("http://localhost:50080/");
+      //}
 
       void OnAddCors(CorsOptions options) => options.AddPolicy("AllowAll", 
                                                                OnAddPolicy);
@@ -85,34 +80,10 @@ namespace Discord.Twitter.TtsBot
       };
 
       app.UseWebSockets(webSocketOptions);
-
       app.UseEndpoints(OnUseEndPoints);
 
-      app.Use(async (context, next) =>
-      {
-        if (context.Request.Path == "/connect")
-        {
-          if (context.WebSockets.IsWebSocketRequest)
-          {
-            var ttsBot = context.RequestServices.GetService<TtsBot>();
-            SNWS.WebSocket webSocket = await context.WebSockets.AcceptWebSocketAsync();
-            var socketFinishedTcs = new TaskCompletionSource<object>();
-
-            ttsBot.AddWebSocket(webSocket, socketFinishedTcs);
-
-            await socketFinishedTcs.Task;
-          }
-          else
-          {
-            context.Response.StatusCode = 400;
-          }
-        }
-        else
-        {
-          await next();
-        }
-      });
-
+      app.Use(app.ApplicationServices.GetService<WebSocketHandler>().OnUse);
+      
       void OnUseEndPoints(IEndpointRouteBuilder endpoints)
       {
         endpoints.MapGrpcService<Impl>()

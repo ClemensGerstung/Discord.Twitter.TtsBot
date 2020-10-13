@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,7 +26,9 @@ namespace Discord.Twitter.TtsBot
     public ICollection<QueueItem> Items => _items.Values;
 
     public event EventHandler<UserChangedEventArgs> UsersChanged;
-    public event EventHandler<ItemQueuedEventArgs> ItemQueued;
+    public event EventHandler<ItemsChangedEventArgs> ItemsChanged;
+    public event EventHandler<ItemsChangedEventArgs> QueueChanged;
+    public event EventHandler<ItemPlayedEventArgs> ItemPlayed;
 
     public DataStore(DatabaseContext context)
     {
@@ -42,7 +45,7 @@ namespace Discord.Twitter.TtsBot
     {
       QueueItem queueItem = GetOrAdd(item);
       _queue.Enqueue(queueItem.TweetId);
-      ItemQueued?.Invoke(this, new ItemQueuedEventArgs(queueItem));
+      QueueChanged?.Invoke(this, new ItemsChangedEventArgs(queueItem, null));
     }
 
     public void AddUser(TwitterUser user)
@@ -89,6 +92,8 @@ namespace Discord.Twitter.TtsBot
       {
         _context.Add(item);
         _context.SaveChanges();
+
+        ItemsChanged?.Invoke(this, new ItemsChangedEventArgs(item, null));
       }
 
       return item;
@@ -96,7 +101,10 @@ namespace Discord.Twitter.TtsBot
 
     public int IncreasePlayCount(QueueItem item)
     {
-      return _items.AddOrUpdate(item.TweetId, item, Update).Played;
+      QueueItem changed = _items.AddOrUpdate(item.TweetId, item, Update);
+      ItemPlayed?.Invoke(this, new ItemPlayedEventArgs(changed));
+
+      return changed.Played;
 
       QueueItem Update(long key, QueueItem existing)
       {
@@ -105,17 +113,56 @@ namespace Discord.Twitter.TtsBot
       }
     }
 
-    public IEnumerable<QueueItem> GetNextQueueItems(int count)
+    public bool Dequeue(out QueueItem item)
     {
-      if (count == 0) count = _queue.Count;
-
-      for (int i = 0; i < count; i++)
+      if(_queue.TryDequeue(out long id))
       {
-        if (_queue.TryDequeue(out long id) &&
-          _items.TryGetValue(id, out QueueItem item))
-        {
-          yield return item;
-        }
+        item = _items[id];
+
+        QueueChanged?.Invoke(this, new ItemsChangedEventArgs(null, item));
+        return true;
+      }
+
+      item = null;
+      return false;
+    }
+
+    public IEnumerator<QueueItem> GetQueueEnumerator(int count)
+    {
+      return new QueueEnumerator(count, this);
+    }
+
+    private class QueueEnumerator : IEnumerator<QueueItem>
+    {
+      private DataStore _store;
+      private int _count;
+      private int _index;
+      private QueueItem _item;
+
+      public QueueItem Current => _item;
+
+      object IEnumerator.Current => this.Current;
+
+      public QueueEnumerator(int count, DataStore store)
+      {
+        _index = 0;
+        _count = count;
+        _store = store;
+      }
+
+      public void Dispose()
+      {
+      }
+
+      public bool MoveNext()
+      {
+        return (_count == _index++) && 
+               _store.Dequeue(out _item);
+      }
+
+      public void Reset()
+      {
+        throw new NotSupportedException();
       }
     }
   }
