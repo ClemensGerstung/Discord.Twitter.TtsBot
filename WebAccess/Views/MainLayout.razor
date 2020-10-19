@@ -1,0 +1,31 @@
+﻿@inherits LayoutComponentBase
+@inject IMainViewModel ViewModel
+
+<MatThemeProvider Theme="@ViewModel.Theme">
+  <MatAppBarContainer>
+    <MatAppBar Fixed="true">
+      <MatAppBarRow>
+        <MatAppBarSection>
+          <MatAppBarTitle>Discord.Twitter.TtsBot</MatAppBarTitle>
+        </MatAppBarSection>
+      </MatAppBarRow>
+    </MatAppBar>
+
+    <MatAppBarContent>
+      <div class="mat-layout-grid">
+        <div class="mat-layout-grid-inner">
+          <div class="mat-layout-grid-cell mat-layout-grid-cell-span-4">
+            <UsersListView />
+          </div>
+          <div class="mat-layout-grid-cell mat-layout-grid-cell-span-4"></div>
+          <div class="mat-layout-grid-cell mat-layout-grid-cell-span-4"></div>
+        </div>
+      </div>
+      <CreateUserView/>
+    </MatAppBarContent>
+  </MatAppBarContainer>
+</MatThemeProvider>
+
+@code
+{
+}

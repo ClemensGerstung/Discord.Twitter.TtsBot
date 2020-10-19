@@ -1,0 +1,24 @@
+﻿@inject CreateUserViewModel ViewModel
+
+<MatDialog @bind-IsOpen="@ViewModel.IsOpen">
+  <MatDialogTitle>Hi </MatDialogTitle>
+  <MatDialogContent>
+    <p>What's your favorite animal?</p>
+    <MatSelect TValue="string" Label="Title">
+      <MatOptionString></MatOptionString>
+      <MatOptionString Value="dr">Dr.</MatOptionString>
+      <MatOptionString Value="prof">Prof.</MatOptionString>
+    </MatSelect>
+    @*<MatTextField></MatTextField>*@
+
+
+  </MatDialogContent>
+  <MatDialogActions>
+    <MatButton>No Thanks</MatButton>
+    <MatButton OnClick="@ViewModel.OkClick">OK</MatButton>
+  </MatDialogActions>
+</MatDialog>
+
+@code {
+
+}

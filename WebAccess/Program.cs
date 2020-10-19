@@ -6,6 +6,7 @@ using Grpc.Net.Client;
 using Grpc.Net.Client.Web;
 using Microsoft.AspNetCore.Components.WebAssembly.Hosting;
 using Microsoft.Extensions.DependencyInjection;
+using WebAccess.ViewModels;
 
 namespace WebAccess
 {
@@ -27,7 +28,9 @@ namespace WebAccess
         return new AdminAccess.AdminAccessClient(channel);
       });
 
-      
+      builder.Services.AddTransient<IMainViewModel, MainViewModel>();
+      builder.Services.AddSingleton<CreateUserViewModel>();
+      builder.Services.AddTransient<UsersListViewModel>();
 
       await builder.Build().RunAsync();
       await channel?.ShutdownAsync();

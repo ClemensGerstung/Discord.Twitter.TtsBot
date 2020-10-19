@@ -1,0 +1,34 @@
+﻿@inject UsersListViewModel ViewModel
+@implements IDisposable
+
+<MatHeadline3>Users</MatHeadline3>
+
+<div class="mat-layout-grid">
+  <MatButton Command="@ViewModel.AddUserCommand" Raised="true">Add User</MatButton>
+</div>
+
+
+@foreach (var user in ViewModel.Users)
+{
+  <WebAccess.Components.TwitterUserCard User="@user" />
+}
+
+@code {
+  protected override async Task OnInitializedAsync()
+  {
+    await base.OnInitializedAsync();
+
+    await ViewModel.InitializeAsync();
+    ViewModel.Users.CollectionChanged += OnUsersCollectionChanged;
+  }
+
+  private void OnUsersCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs args)
+  {
+    StateHasChanged();
+  }
+
+  public void Dispose()
+  {
+    ViewModel.Users.CollectionChanged -= OnUsersCollectionChanged;
+  }
+}
