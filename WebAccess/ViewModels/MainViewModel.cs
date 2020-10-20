@@ -4,6 +4,7 @@ using System.Linq;
 
 namespace WebAccess.ViewModels
 {
+
   public interface IMainViewModel
   {
     MatTheme Theme { get; }

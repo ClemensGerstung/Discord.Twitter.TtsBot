@@ -1,21 +1,21 @@
-﻿@inject CreateUserViewModel ViewModel
+﻿@inherits ViewBaseComponent<CreateUserViewModel>
 
 <MatDialog @bind-IsOpen="@ViewModel.IsOpen">
-  <MatDialogTitle>Hi </MatDialogTitle>
+  <MatDialogTitle>Add new TwitterUser</MatDialogTitle>
   <MatDialogContent>
-    <p>What's your favorite animal?</p>
-    <MatSelect TValue="string" Label="Title">
-      <MatOptionString></MatOptionString>
-      <MatOptionString Value="dr">Dr.</MatOptionString>
-      <MatOptionString Value="prof">Prof.</MatOptionString>
-    </MatSelect>
-    @*<MatTextField></MatTextField>*@
-
-
+    <p>
+      <MatTextField Icon="person" @bind-Value="@ViewModel.Handle" Dense="true" Label="Handle"></MatTextField>
+    </p>
+    <p>
+      <MatTextField Icon="language" @bind-Value="@ViewModel.Language" Dense="true" Label="Language"></MatTextField>
+    </p>
+    <p>
+      <MatTextField Icon="keyboard_voice" @bind-Value="@ViewModel.VoiceName" Dense="true" Label="VoiceName"></MatTextField>
+    </p>
   </MatDialogContent>
   <MatDialogActions>
-    <MatButton>No Thanks</MatButton>
-    <MatButton OnClick="@ViewModel.OkClick">OK</MatButton>
+    <MatButton OnClick="@ViewModel.CancelClick">Cancel</MatButton>
+    <MatButton OnClick="@ViewModel.OkClick">Add</MatButton>
   </MatDialogActions>
 </MatDialog>
 
