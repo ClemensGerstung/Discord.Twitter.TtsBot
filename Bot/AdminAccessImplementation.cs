@@ -60,7 +60,7 @@ namespace Discord.Twitter.TtsBot
       switch (request.NewItemCase)
       {
         case AddQueueRequest.NewItemOneofCase.Item:
-          response.Item = request.Item;
+          item = response.Item = request.Item;
           break;
         case AddQueueRequest.NewItemOneofCase.TweetId:
           ITweet tweet = await TweetAsync.GetTweet(request.TweetId);
@@ -287,7 +287,7 @@ namespace Discord.Twitter.TtsBot
 
       return items.Where(q => users.Contains(q.User))
                   .Where(q => q.Content.Contains(request.Filter))
-                  .Where(q => q.Created >= from && q.Created < to);
+                  .Where(q => q.Created >= from && q.Created <= to);
     }
 
     private async Task<IEnumerable<QueueItem>> PlayQueueItemsAsync(Func<Task<QueueItem>> aquireItem)

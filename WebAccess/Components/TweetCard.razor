@@ -8,7 +8,7 @@
       </MatHeadline6>
       <MatSubtitle1>@@@Item.User.Handle</MatSubtitle1>
       <MatSubtitle2 class="demo-mat-card-clean-margin">
-        @Item.Created.ToDateTime().ToString("g")
+        @Item.Created.ToDateTime().ToLocalTime().ToString("g")
       </MatSubtitle2>
     </div>
 
@@ -37,5 +37,9 @@
 
   public async Task OnAddToQueueClick()
   {
+    if (!ShowAddToQueue) return;
+
+    var response = await Client.AddQueueItemAsync(new AddQueueRequest { Item = Item });
+    var resp = await Client.ReadNextQueueItemsAsync(new ReadNextQueueItemsRequest());
   }
 }

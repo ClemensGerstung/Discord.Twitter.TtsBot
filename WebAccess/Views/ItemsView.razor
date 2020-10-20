@@ -1,0 +1,8 @@
+﻿@inherits ViewBaseComponent<ItemsViewModel>
+
+<MatHeadline3>Items</MatHeadline3>
+
+@foreach (var item in ViewModel.Items)
+{
+  <WebAccess.Components.TweetCard Item="@item" />
+}

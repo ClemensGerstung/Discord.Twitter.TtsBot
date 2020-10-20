@@ -1,0 +1,15 @@
+﻿@inherits ViewBaseComponent<QueueViewModel>
+@inject AdminAccess.AdminAccessClient Client
+
+<MatHeadline3>Queue</MatHeadline3>
+
+<p>
+  <MatButton Icon="playlist_play" Unelevated="true">Play All</MatButton>
+  <MatButton Icon="play_arrow" Outlined="true">Play Next</MatButton>
+</p>
+
+@foreach (var item in ViewModel.QueueItems)
+{
+  <WebAccess.Components.TweetCard Item="@item" ShowAddToQueue="false" />
+}
+
