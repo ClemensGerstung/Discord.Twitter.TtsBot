@@ -4,6 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <Configurations>Debug;Release;Release-ARM</Configurations>
+    <AssemblyName>Server</AssemblyName>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
@@ -34,18 +35,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Protobuf Include="..\admin-access.proto" GrpcServices="Both">
-      <Link>Proto\admin-access.proto</Link>
-    </Protobuf>
-    <Protobuf Include="..\clientcommunication.proto">
-      <Link>Proto\clientcommunication.proto</Link>
-    </Protobuf>
-    <Protobuf Include="..\common.proto">
-      <Link>Proto\common.proto</Link>
-    </Protobuf>
-  </ItemGroup>
-
-  <ItemGroup>
     <None Update="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
@@ -58,7 +47,7 @@
  </ItemGroup>
 
   <ItemGroup>
-    <Folder Include="Proto\" />
+    <ProjectReference Include="..\Common\Common.csproj" />
   </ItemGroup>
 
 </Project>

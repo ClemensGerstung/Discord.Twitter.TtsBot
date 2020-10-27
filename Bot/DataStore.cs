@@ -3,10 +3,7 @@ using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Discord.Twitter.TtsBot.AdminAccess;
-using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Tweetinvi.Core.Extensions;
 
 namespace Discord.Twitter.TtsBot

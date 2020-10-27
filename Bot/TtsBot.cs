@@ -21,13 +21,12 @@ using SNWS = System.Net.WebSockets;
 using System.Collections.Generic;
 using Google.Protobuf;
 using Tweetinvi.Logic.TwitterEntities;
+using Microsoft.Extensions.Logging;
 
 namespace Discord.Twitter.TtsBot
 {
   public class TtsBot
   {
-    private ILog __log = LogManager.GetLogger(typeof(TtsBot));
-
     private Option _option;
     private DiscordSocketClient _discord;
     private TextToSpeechClient _ttsClient;
@@ -36,16 +35,17 @@ namespace Discord.Twitter.TtsBot
     private Regex _tweetIdRegex;
     private AdminAccess.AdminAccess.AdminAccessClient _grpcClient;
     private DataStore _store;
-    
+    private ILogger<TtsBot> _logger;
 
     private IFilteredStream _stream;
     private Task _twitterStreamTask;
 
-    public TtsBot(Option option, AdminAccess.AdminAccess.AdminAccessClient grpcClient, DataStore store)
+    public TtsBot(ILogger<TtsBot> logger, Option option, AdminAccess.AdminAccess.AdminAccessClient grpcClient, DataStore store)
     {
       _option = option ?? throw new ArgumentNullException(nameof(option));
       _grpcClient = grpcClient ?? throw new ArgumentNullException(nameof(grpcClient));
       _store = store ?? throw new ArgumentNullException(nameof(store));
+      _logger = logger ?? throw new ArgumentNullException(nameof(logger));
       _tweetIdRegex = new Regex(@"\/(?<tweetId>\d+)");
       
       if (option.GoogleUseEnvironmentVariable)
@@ -66,7 +66,7 @@ namespace Discord.Twitter.TtsBot
       _discord = new DiscordSocketClient();
       _discord.Log += obj =>
       {
-        Console.WriteLine(obj);
+        _logger.LogDebug("{0}", obj);
         return Task.CompletedTask;
       };
 
@@ -198,6 +198,8 @@ namespace Discord.Twitter.TtsBot
     {
       if (_store.UserTracked(args.Tweet.CreatedBy.Id))
       {
+        _logger.LogInformation("Received Tweet {0} by user {1}", args.Tweet.Id, args.Tweet.CreatedBy.Id);
+
         _ = AddAndReadTweet(args.Tweet.Id);
       }
     }
@@ -230,7 +232,7 @@ namespace Discord.Twitter.TtsBot
         },
         AudioConfig = new AudioConfig
         {
-          AudioEncoding = AudioEncoding.OggOpus
+          AudioEncoding = AudioEncoding.OggOpus, 
         }
       };
 
@@ -260,7 +262,7 @@ namespace Discord.Twitter.TtsBot
       }
       catch (Exception exception)
       {
-        __log.Error(exception);
+        _logger.LogError(exception, "Exception when reading Tweet");
       }
       finally
       {

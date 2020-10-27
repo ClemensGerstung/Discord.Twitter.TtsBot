@@ -34,7 +34,7 @@ namespace WebAccess.Views
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
 
         foreach (var collection in accessor.GetMembers()
-                                        .Where(member => member.Type == typeof(INotifyCollectionChanged))
+                                        .Where(member => typeof(INotifyCollectionChanged).IsAssignableFrom(member.Type))
                                         .Select(member => accessor[ViewModel, member.Name] as INotifyCollectionChanged))
         {
           collection.CollectionChanged += OnViewModelCollectionChanged;

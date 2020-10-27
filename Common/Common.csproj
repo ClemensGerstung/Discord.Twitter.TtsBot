@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>Discord.Twitter.TtsBot</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="Proto\AdminAccess.proto" />
+    <None Remove="Proto\ClientCommunication.proto" />
+    <None Remove="Proto\Common.proto" />
+  </ItemGroup>
+
+	<ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.13.0" />
+    <PackageReference Include="Grpc" Version="2.32.0" />
+    <PackageReference Include="Grpc.Core" Version="2.32.0" />
+    <PackageReference Include="Grpc.Tools" Version="2.32.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.3" />
+    <PackageReference Include="TweetinviAPI" Version="4.0.3" />
+  </ItemGroup>
+
+	<ItemGroup>
+	  <Protobuf Include="Proto\AdminAccess.proto" />
+	  <Protobuf Include="Proto\ClientCommunication.proto" />
+	  <Protobuf Include="Proto\Common.proto" />
+	</ItemGroup>
+
+</Project>

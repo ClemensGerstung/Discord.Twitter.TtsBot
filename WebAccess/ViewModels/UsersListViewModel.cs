@@ -19,7 +19,7 @@ namespace WebAccess.ViewModels
 
     public ICommand AddUserCommand { get; }
 
-    public UsersListViewModel(AdminAccess.AdminAccessClient client, IDialogService dialogService)
+    public UsersListViewModel(AdminAccess.AdminAccessClient client, IDialogService dialogService, IWebSocketHandler webSocketHandler)
     {
       _client = client;
       _dialogService = dialogService;

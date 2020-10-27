@@ -9,10 +9,16 @@ namespace Discord.Twitter.TtsBot
 
     public TwitterUser OldUser { get; }
 
-    internal UserChangedEventArgs(TwitterUser newUser, TwitterUser oldUser)
+    public UserChangedEventArgs(TwitterUser newUser, TwitterUser oldUser)
     {
       NewUser = newUser;
       OldUser = oldUser;
+    }
+
+    public UserChangedEventArgs(UserChangedNotification notification)
+      : this(notification.NewUser, notification.OldUser)
+    {
+
     }
   }
 
@@ -27,6 +33,12 @@ namespace Discord.Twitter.TtsBot
       NewItem = newItem;
       OldItem = oldItem;
     }
+
+    public ItemsChangedEventArgs(QueueChangedNotification notification)
+      : this(notification.NewItem, notification.OldItem)
+    {
+
+    }
   }
 
   public class ItemPlayedEventArgs : EventArgs
@@ -36,6 +48,12 @@ namespace Discord.Twitter.TtsBot
     public ItemPlayedEventArgs(QueueItem item)
     {
       Item = item;
+    }
+
+    public ItemPlayedEventArgs(ItemPlayedNotification notification)
+      : this(notification.Item)
+    {
+
     }
   }
 }

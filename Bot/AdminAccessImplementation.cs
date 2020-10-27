@@ -139,6 +139,7 @@ namespace Discord.Twitter.TtsBot
 
       if (!response.IsEmpty)
       {
+        _logger.LogInformation("Added Item {0} by {1}", item.TweetId, item.User.Handle);
         _dataStore.Enqueue(item);
       }
 

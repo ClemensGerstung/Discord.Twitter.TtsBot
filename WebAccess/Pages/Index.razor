@@ -16,59 +16,6 @@
 <div class="mat-layout-grid">
   <div class="mat-layout-grid-inner">
     <div class="mat-layout-grid-cell mat-layout-grid-cell-span-4">
-      @*<MatButton OnClick="@OnNormalClick">Normal Tweet</MatButton>
-      <MatButton OnClick="@OnRetweetedClick">Retweetet Tweet</MatButton>
-      <MatButton OnClick="@OnQuotedClick">Quoted Tweet</MatButton>
-
-      <MatButton OnClick="@OnPlayClick">Play</MatButton>
-
-      <MatButton OnClick="@OnAddUserClick">Add User</MatButton>
-
-      <MatButton OnClick="@OnWebSocketConnect">UseWebSocket</MatButton>*@
-      
-
-      <MatTextField @bind-Value="@NewUserHandle" Label="User Handle"></MatTextField>
-
-      <MatButton OnClick="@OnAddUserClick">Add User</MatButton>
-
-      <MatList>
-        @foreach (var user in Users)
-        {
-          <WebAccess.Components.TwitterUserCard User="@user" />
-        }
-      </MatList>
-    </div>
-    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-4">
-      <MatHeadline3>Queue</MatHeadline3>
-
-      <MatButton Icon="playlist_play" Unelevated="true">Play All</MatButton>
-      <MatButton Icon="play_arrow" Outlined="true">Play Next</MatButton>
-
-      <MatButton OnClick="@OnNormalClick">Normal Tweet</MatButton>
-      <MatButton OnClick="@OnRetweetedClick">Retweetet Tweet</MatButton>
-      <MatButton OnClick="@OnQuotedClick">Quoted Tweet</MatButton>
-
-      <MatList>
-        @foreach (var item in QueueItems)
-        {
-          <WebAccess.Components.TweetCard Item="@item" ShowAddToQueue="false" />
-        }
-      </MatList>
-    </div>
-
-    <div class="mat-layout-grid-cell mat-layout-grid-cell-span-4">
-      <MatHeadline3>Items</MatHeadline3>
-
-      <MatButton OnClick="@OnNormalClick">Normal Tweet</MatButton>
-      <MatButton OnClick="@OnRetweetedClick">Retweetet Tweet</MatButton>
-      <MatButton OnClick="@OnQuotedClick">Quoted Tweet</MatButton>
-
-      <MatList>
-        @foreach (var item in Items)
-        {
-          <WebAccess.Components.TweetCard Item="@item" />
-        }
-      </MatList>
     </div>
   </div>
 </div>

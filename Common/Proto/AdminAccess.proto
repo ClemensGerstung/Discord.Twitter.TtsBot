@@ -1,6 +1,6 @@
 ﻿syntax = "proto3";
 
-import "common.proto";
+import "Proto/Common.proto";
 import "google/protobuf/timestamp.proto";
 
 package discord.twitter.ttsBot.adminAccess;

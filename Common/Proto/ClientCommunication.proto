@@ -1,14 +1,15 @@
 syntax = "proto3";
 
-import "common.proto";
+import "Proto/Common.proto";
 
 package discord.twitter.ttsBot.adminAccess;
 
 enum NotificationType {
-  UserChanged = 0;
-  QueueChanged = 1;
-  ItemsChanged = 2;
-  ItemPlayed = 3;
+  None = 0;
+  UserChanged = 1;
+  QueueChanged = 2;
+  ItemsChanged = 3;
+  ItemPlayed = 4;
 }
 
 message NotificationItem {
