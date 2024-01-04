@@ -1,3 +1,6 @@
+> [!WARNING]  
+> This project is deprecated (if you haven't guessed since the last commit) because f*** Twitter/X!
+
 # Discord.Twitter.TtsBot
 
 A simple bot which checks for new tweets of a user, uses Google Cloud TTS to say the tweet within discord.  
